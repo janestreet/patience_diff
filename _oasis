@@ -22,9 +22,7 @@ Library patience_diff
   Modules:       Patience_diff
   BuildDepends:  core_kernel,
                  pa_pipebang,
-                 sexplib.syntax,
-                 threads
+                 sexplib.syntax
   XMETARequires: core_kernel,
                  pa_pipebang,
-                 sexplib,
-                 threads
+                 sexplib
