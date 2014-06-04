@@ -53,6 +53,17 @@ val get_matching_blocks :
   -> other:'a array
   -> Matching_block.t list
 
+(** [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that the
+    list is strictly increasing in both its first and second coordinates.  This is
+    essentially a "unfolded" version of what [get_matching_blocks] returns. Instead of
+    grouping the consecutive matching block using [length] this function would return all
+    the pairs (mine_start * other_start). *)
+val matches
+  : compare:('a -> 'a -> int)
+  -> 'a array
+  -> 'a array
+  -> (int * int) list
+
 val ratio : 'a array -> 'a array -> float
 
 (** For handling diffs abstractly.  A range is a subarray of the two original
