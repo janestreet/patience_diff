@@ -179,18 +179,18 @@ let longest_increasing_subsequence ar =
 (* This is an implementation of the patience diff algorithm by Bram Cohen as seen in
    Bazaar version 1.14.1 *)
 
-let unique_lcs (a,alo,ahi) (b,blo,bhi) =
+let unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) =
   (* Create a hashtable which takes elements of a to their index in a iff they're unique *)
   let unique = Hashtbl.Poly.create () ~size:(min (ahi - alo) (bhi - blo)) in
   for x's_pos_in_a = alo to ahi - 1 do
-    let x = a.(x's_pos_in_a) in
+    let x = alpha.(x's_pos_in_a) in
     match Hashtbl.find unique x with
     | None -> Hashtbl.replace unique ~key:x ~data:(`Unique_in_a x's_pos_in_a)
     | Some _ -> Hashtbl.replace unique ~key:x ~data:`Not_unique
   done;
 
   for x's_pos_in_b = blo to bhi - 1 do
-    let x = b.(x's_pos_in_b) in
+    let x = bravo.(x's_pos_in_b) in
     Hashtbl.find unique x |! Option.iter ~f:(fun pos ->
       match pos with
       | `Not_unique -> ()
@@ -222,7 +222,7 @@ let unique_lcs (a,alo,ahi) (b,blo,bhi) =
 
    I couldn't figure out how to do this efficiently in a functional way, so
    this is pretty much a straight translation of the original Python code. *)
-let matches ~compare a b =
+let matches ~compare alpha bravo =
   let matches_ref_length = ref 0 in
   let matches_ref = ref [] in
   let add_match m =
@@ -235,7 +235,7 @@ let matches ~compare a b =
     if not (alo >= ahi || blo >= bhi) then begin
       let last_a_pos = ref (alo - 1) in
       let last_b_pos = ref (blo - 1) in
-      unique_lcs (a,alo,ahi) (b,blo,bhi)
+      unique_lcs (alpha,alo,ahi) (bravo,blo,bhi)
       |! List.iter ~f:(fun (apos,bpos) ->
 (*           printf "found apos %d bpos %d\n%!" apos bpos; *)
            if !last_a_pos + 1 <> apos || !last_b_pos + 1 <> bpos
@@ -248,23 +248,23 @@ let matches ~compare a b =
            add_match (apos,bpos));
       if !matches_ref_length > old_length
       then recurse_matches (!last_a_pos+1) (!last_b_pos+1) ahi bhi
-      else if (compare a.(alo) b.(blo) = 0)
+      else if (compare alpha.(alo) bravo.(blo) = 0)
       then
         begin
           let alo = ref alo in
           let blo = ref blo in
-          while (!alo < ahi && !blo < bhi && (compare a.(!alo) b.(!blo) = 0)) do
+          while (!alo < ahi && !blo < bhi && (compare alpha.(!alo) bravo.(!blo) = 0)) do
             add_match (!alo,!blo);
             incr alo; incr blo;
           done;
           recurse_matches !alo !blo ahi bhi;
         end
-      else if (compare a.(ahi - 1) b.(bhi - 1) = 0)
+      else if (compare alpha.(ahi - 1) bravo.(bhi - 1) = 0)
       then
         begin
           let nahi = ref (ahi - 1) in
           let nbhi = ref (bhi - 1) in
-          while (!nahi > alo && !nbhi > blo && a.(!nahi-1) = b.(!nbhi - 1)) do
+          while (!nahi > alo && !nbhi > blo && alpha.(!nahi-1) = bravo.(!nbhi - 1)) do
             decr nahi; decr nbhi;
           done;
           recurse_matches (!last_a_pos+1) (!last_b_pos+1) !nahi !nbhi;
@@ -272,10 +272,25 @@ let matches ~compare a b =
             add_match (!nahi + i,!nbhi + i)
           done;
         end
+      else
+        Plain_diff.iter_matches
+          (Array.sub alpha ~pos:alo ~len:(ahi - alo))
+          (Array.sub bravo ~pos:blo ~len:(bhi - blo))
+          ~f:(fun (i1, i2) -> add_match (alo + i1, blo + i2))
     end
   in
-  recurse_matches 0 0 (Array.length a) (Array.length b);
+  recurse_matches 0 0 (Array.length alpha) (Array.length bravo);
   List.rev !matches_ref
+;;
+
+TEST_UNIT =
+  let check a b ~expect =
+    <:test_result< (int * int) list >>
+      (matches ~compare:Int.compare a b) ~expect
+  in
+  check [||] [||] ~expect:[];
+  check [|0|] [|0|] ~expect:[0,0];
+  check [|0;1;1;2|] [|3;1;4;5|] ~expect:[1,1]; (* Needs the plain diff section *)
 ;;
 
 module Matching_block = struct
