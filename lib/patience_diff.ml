@@ -1,20 +1,38 @@
 open Core_kernel.Std
+open Core_kernel.Std.Int.Replace_polymorphic_compare
 
 let ( <|> ) ar ij = if snd ij <= fst ij  then [||] else ar <|> ij
 
+module Ordered_sequence : sig
+  type elt = int * int with compare
+  (* A [t] has its second coordinates in increasing order *)
+  type t = private elt array with sexp_of
+
+  val create : (int * int) list -> t
+
+  val is_empty : t -> bool
+end = struct
+  type elt = int * int with sexp_of
+
+  let compare_elt = Comparable.lexicographic [
+    (fun (_,y0) (_,y1) -> Int.compare y0 y1);
+    (fun (x0,_) (x1,_) -> Int.compare x0 x1);
+  ]
+
+  type t = elt array with sexp_of
+  let create l =
+    let t = Array.of_list l in
+    Array.sort t ~cmp:compare_elt;
+    t
+
+  let is_empty = Array.is_empty
+end
+
 (* This is an implementation of the patience sorting algorithm as explained at
    http://en.wikipedia.org/wiki/Patience_sorting *)
-module Patience = struct
-
-  module type Tagged_array_elt = sig
-    (* the significance is this type is just that, given some [Tagged.t]'s, the [value] field
-       is the one you want to sort by, whereas the [tag] field is just some extra info. *)
-    type 'a tag
-    type 'a t =
-        { value : 'a;
-          tag : 'a tag option;
-        }
-  end
+module Patience : sig
+  val longest_increasing_subsequence : Ordered_sequence.t -> (int * int) list
+end = struct
 
   module Pile = struct
     type 'a t = 'a Stack.t
@@ -37,80 +55,6 @@ module Patience = struct
       | `From_right -> get Dequeue.back_index (-i)
 
     let new_rightmost_pile t pile = Dequeue.enqueue_back t pile
-    let length t = Dequeue.length t
-  end
-
-  module Play_patience (Tagged:Tagged_array_elt) = struct
-    (* Returns the first [i] such that [f i >= 0] and [f (i - 1) < 0 || i = low], if
-       any. *)
-    let bsearch_opt ~f ~low ~high =
-      let rec loop ~f ~low ~high =
-        if low = high then
-          match f low with
-          | 0 -> Some low
-          | x -> if x > 0 then Some low else None
-        else let mid = (low + high)/2 in
-          match f mid with
-          | 0 -> Some mid
-          | x -> if x > 0
-            then loop ~f ~low ~high:mid
-            else loop ~f ~low:(mid+1) ~high
-      in
-      if high < low
-      then None
-      else loop ~f ~low ~high
-    ;;
-
-    (* version of Piles.find_i_from_left optimized for this specific application.
-       It assumes that if pile1 is to the left of pile2 then (f pile1) implies
-       (f pile2). *)
-    let optimized_findi_from_left piles ~f ~prev =
-      let (>>=) = Option.(>>=) in
-      let (>>|) = Option.(>>|) in
-      (* first see if any work *)
-      let last_pile = Piles.get_ith_pile piles 0 `From_right in
-      last_pile >>= fun last_pile ->
-        if not (f last_pile) then None
-        else
-          (* see if the one after the previous one works *)
-          let one_after_prev =
-            prev >>= fun prev -> Piles.get_ith_pile piles (prev + 1) `From_left in
-          if Option.value_map one_after_prev ~f ~default:false then
-            prev >>= fun i -> one_after_prev >>| fun x -> (i,x)
-          else begin
-            (* do binary search *)
-            try
-              bsearch_opt ~f:(fun i ->
-                let pile = Piles.get_ith_pile piles i `From_left |! Option.value_exn in
-                if f pile then 1 else -1) ~low:0 ~high:(Piles.length piles)
-              |! Option.map ~f:(fun i ->
-                (i,Option.value_exn (Piles.get_ith_pile piles i `From_left)))
-            with _ -> None
-          end
-    ;;
-    (* [play_patience ar ~get_tag] plays patience with the greedy algorithm as described
-       in the Wikipedia article, taking [ar] to be the deck of cards.  It returns the
-       resulting [Piles.t].  Before putting an element of [ar] in a pile, it tags it using
-       [get_tag].  [get_tag] takes as its arguments the full [Piles.t] in its current
-       state, and also the specific [Pile.t] that the element of [ar] is being added to.
-    *)
-    let play_patience ar ~get_tag =
-      if Array.length ar = 0 then raise (Invalid_argument "Patience_diff.play_patience");
-      let piles = Piles.empty () in
-      let prev = ref None in
-      Array.iter ar ~f:(fun x ->
-        let pile_opt = optimized_findi_from_left piles ~prev:!prev ~f:(fun pile -> x < (Pile.top pile).Tagged.value) in
-        let tagged_x = {Tagged.value = x;tag = get_tag ~pile_opt ~piles} in
-        match pile_opt with
-        | None -> begin
-            prev := None;
-            Piles.new_rightmost_pile piles (Pile.create tagged_x)
-          end
-        | Some (i,pile) -> begin
-            prev := Some i;
-            Pile.put_on_top pile tagged_x
-          end);
-      piles
   end
 
   module Backpointers = struct
@@ -129,15 +73,62 @@ module Patience = struct
       to_list [] t
   end
 
+  module Play_patience : sig
+    val play_patience :
+      Ordered_sequence.t
+      -> get_tag:(
+        pile_opt:int option
+        -> piles:Ordered_sequence.elt Backpointers.t Piles.t
+        -> Ordered_sequence.elt Backpointers.tag option
+      )
+      -> Ordered_sequence.elt Backpointers.t Piles.t
+  end = struct
+    let optimized_findi_from_left piles x =
+      let (>>=) = Option.(>>=) in
+      (* first see if any work *)
+      let last_pile = Piles.get_ith_pile piles 0 `From_right in
+      (* [x_pile] is a dummy pile just used for comparisons *)
+      let x_pile = Pile.create {Backpointers.value=(x,0); tag = None} in
+      let compare_top_values pile1 pile2 =
+        let top pile = fst (Pile.top pile).Backpointers.value in
+        Int.compare (top pile1) (top pile2)
+      in
+      last_pile >>= fun last_pile ->
+      if compare_top_values last_pile x_pile < 0 then None
+      else
+        (* do binary search *)
+        Dequeue.binary_search piles `First_strictly_greater_than x_pile
+          ~compare:compare_top_values
+    ;;
+    (* [play_patience ar ~get_tag] plays patience with the greedy algorithm as described
+       in the Wikipedia article, taking [ar] to be the deck of cards.  It returns the
+       resulting [Piles.t].  Before putting an element of [ar] in a pile, it tags it using
+       [get_tag].  [get_tag] takes as its arguments the full [Piles.t] in its current
+       state, and also the specific [Pile.t] that the element of [ar] is being added to.
+    *)
+    let play_patience ar ~get_tag =
+      let ar = (ar : Ordered_sequence.t :> Ordered_sequence.elt array) in
+      if Array.length ar = 0 then raise (Invalid_argument "Patience_diff.play_patience");
+      let piles = Piles.empty () in
+      Array.iter ar ~f:(fun x ->
+        let pile_opt = optimized_findi_from_left piles  (fst x) in
+        let tagged_x = {Backpointers.value = x;tag = get_tag ~pile_opt ~piles} in
+        match pile_opt with
+        | None -> Piles.new_rightmost_pile piles (Pile.create tagged_x)
+        | Some i -> let pile = Dequeue.get piles i in Pile.put_on_top pile tagged_x
+      );
+      piles
+  end
+
   let longest_increasing_subsequence ar =
-    if ar = [||] then [] else begin
-      let module P = Play_patience (Backpointers) in
+    if Ordered_sequence.is_empty ar then [] else begin
+      let module P = Play_patience in
       let get_tag ~pile_opt ~piles =
         match pile_opt with
         | None -> Piles.get_ith_pile piles 0 `From_right |! Option.map ~f:Pile.top
-        | Some (i,_pile) ->
-            if i = 0 then None
-            else Piles.get_ith_pile piles (i-1) `From_left |! Option.value_exn |! Pile.top |! Option.some
+        | Some i ->
+          if i = 0 then None
+          else Piles.get_ith_pile piles (i-1) `From_left |! Option.value_exn |! Pile.top |! Option.some
       in
       let piles = P.play_patience ar ~get_tag in
       Piles.get_ith_pile piles 0 `From_right |! Option.value_exn |! Pile.top |!
@@ -145,8 +136,8 @@ module Patience = struct
     end
 end
 
-(* this seems simpler, same complexity, but might be a bit slower in practice
-let longest_increasing_subsequence ar =
+let _longest_increasing_subsequence ar =
+  let ar = (ar : Ordered_sequence.t :> (int * int) array) in
   let len = Array.length ar in
   if len <= 1 then
     Array.to_list ar
@@ -156,12 +147,13 @@ let longest_increasing_subsequence ar =
     let pred = Array.create ~len:(len + 1) (-1) in
     for i = 0 to len - 1 do
       let p =
-        match Search_foo.bsearch ~low:1 ~high:!maxlen ~f:(fun p -> snd(ar.(i)) - snd(ar.(p))) with
-        | None -> 0
-        | Some p -> p
+        Array.binary_search ~compare:Ordered_sequence.compare_elt
+          ar
+          `First_greater_than_or_equal_to ar.(i) ~len:(max (!maxlen - 1) 0) ~pos:1
+        |> Option.value ~default:0
       in
       pred.(i) <- m.(p);
-      if (p = !maxlen) || (ar.(i) < ar.(p + 1)) then begin
+      if (p = !maxlen) || (Pervasives.(<) ar.(i) ar.(p + 1)) then begin
         m.(p + 1) <- i;
         if (p + 1) > !maxlen then maxlen := p + 1;
       end;
@@ -174,7 +166,6 @@ let longest_increasing_subsequence ar =
     loop [] m.(!maxlen)
   end
 ;;
-*)
 
 (* This is an implementation of the patience diff algorithm by Bram Cohen as seen in
    Bazaar version 1.14.1 *)
@@ -206,9 +197,7 @@ let unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) =
       | `Unique_in_a _ -> None
       | `Unique_in_a_b pos_in_a_b -> Some pos_in_a_b)
     in
-    let a_b = Array.of_list (Hashtbl.data unique) in
-    Array.sort a_b ~cmp:(fun (_,posb1) (_,posb2) -> Int.compare posb1 posb2);
-    a_b
+    Ordered_sequence.create (Hashtbl.data unique)
   in
   Patience.longest_increasing_subsequence a_b
 
@@ -264,7 +253,8 @@ let matches ~compare alpha bravo =
         begin
           let nahi = ref (ahi - 1) in
           let nbhi = ref (bhi - 1) in
-          while (!nahi > alo && !nbhi > blo && alpha.(!nahi-1) = bravo.(!nbhi - 1)) do
+          while (!nahi > alo && !nbhi > blo && compare alpha.(!nahi-1) bravo.(!nbhi - 1) =
+   0) do
             decr nahi; decr nbhi;
           done;
           recurse_matches (!last_a_pos+1) (!last_b_pos+1) !nahi !nbhi;
@@ -283,15 +273,59 @@ let matches ~compare alpha bravo =
   List.rev !matches_ref
 ;;
 
-TEST_UNIT =
-  let check a b ~expect =
-    <:test_result< (int * int) list >>
-      (matches ~compare:Int.compare a b) ~expect
-  in
-  check [||] [||] ~expect:[];
-  check [|0|] [|0|] ~expect:[0,0];
-  check [|0;1;1;2|] [|3;1;4;5|] ~expect:[1,1]; (* Needs the plain diff section *)
-;;
+TEST_MODULE = struct
+
+  TEST_UNIT =
+    let check a b ~expect =
+      <:test_result< (int * int) list >>
+        (matches ~compare:Int.compare a b) ~expect
+    in
+    check [||] [||] ~expect:[];
+    check [|0|] [|0|] ~expect:[0,0];
+    check [|0;1;1;2|] [|3;1;4;5|] ~expect:[1,1]; (* Needs the plain diff section *)
+  ;;
+
+  let rec is_increasing a = function
+    | [] -> true
+    | hd :: tl ->
+      Int.compare a hd <= 0 && is_increasing hd tl
+  ;;
+
+  let check_lis a =
+    let b = Patience.longest_increasing_subsequence (Ordered_sequence.create a) in
+    if is_increasing (-1) (List.map b ~f:fst)
+    && is_increasing (-1) (List.map b ~f:snd)
+    then ()
+    else
+      failwiths "invariant failure" (a, b)
+        <:sexp_of< (int * int) list * (int*int) list >>
+  ;;
+
+  TEST_UNIT =
+    check_lis [(2,0);(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)];
+  ;;
+
+  TEST_UNIT =
+    check_lis [(0,0);(2,0);(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)];
+  ;;
+
+  TEST_UNIT =
+    check_lis [(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)];
+  ;;
+
+  TEST_UNIT =
+    let check a b =
+      let matches = matches ~compare:Int.compare a b in
+      if is_increasing (-1) (List.map matches ~f:fst)
+      && is_increasing (-1) (List.map matches ~f:snd)
+      then ()
+      else
+        failwiths "invariant failure" (a, b, matches)
+          <:sexp_of< int array * int array * (int*int) list >>
+    in
+    check [|0;1;2;3;4;5;6|] [|2;5;6;3;0;4;1|]
+  ;;
+end
 
 module Matching_block = struct
   type t = {
@@ -626,12 +660,12 @@ let ranges hunks =
   List.concat_map hunks ~f:(fun hunk -> hunk.Hunk.ranges)
 
 let ratio a b =
-  (matches ~compare a b |! List.length |! ( * ) 2 |! float) /. (Array.length a + Array.length b |! float)
+  (matches ~compare:Pervasives.compare a b |! List.length |! ( * ) 2 |! float) /. (Array.length a + Array.length b |! float)
 
 let collapse_multi_sequences matches =
   let collapsed = ref [] in
   let value_exn x = Option.value_exn x in
-  if matches = [] then [] else
+  if List.is_empty matches then [] else
     let start = Array.create ~len:(List.length (List.hd_exn matches)) None in
     let length = ref 0 in
     List.iter matches ~f:(fun il ->
@@ -665,7 +699,8 @@ let array_mapi2 ar1 ar2 ~f =
 let merge ar =
   if Array.length ar = 0 then [] else
     if Array.length ar = 1 then [Same ar.(0)] else
-      let matches's = Array.map (ar <|> (1,(Array.length ar))) ~f:(matches ~compare ar.(0)) in
+      let matches's = Array.map (ar <|> (1,(Array.length ar)))
+                        ~f:(matches ~compare:Pervasives.compare ar.(0)) in
       let len = Array.length ar in
       let hashtbl = Hashtbl.Poly.create () ~size:0 in
       Array.iteri matches's ~f:(fun i matches ->
@@ -677,9 +712,9 @@ let merge ar =
         Hashtbl.to_alist hashtbl
         |! List.filter_map ~f:(fun (a,l) ->
           if List.length l = len - 1
-          then Some (a::(List.sort l ~cmp:compare |! List.map ~f:snd))
+          then Some (a::(List.sort l ~cmp:Pervasives.compare |! List.map ~f:snd))
           else None)
-        |! List.sort ~cmp:compare
+        |! List.sort ~cmp:Pervasives.compare
       in
       let matching_blocks = collapse_multi_sequences list in
       let last_pos = Array.create ~len:(Array.length ar) 0 in
@@ -687,7 +722,7 @@ let merge ar =
       List.iter matching_blocks ~f:(fun (l,len) ->
         let ar' = Array.of_list l in
         begin
-          if last_pos <> ar'
+          if Pervasives.compare last_pos ar' <> 0
           then merged_array :=
             (Different (array_mapi2 last_pos ar' ~f:(fun i n m -> ar.(i) <|>
                 (n,m))))::!merged_array
