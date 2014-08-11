@@ -176,8 +176,8 @@ let unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) =
   for x's_pos_in_a = alo to ahi - 1 do
     let x = alpha.(x's_pos_in_a) in
     match Hashtbl.find unique x with
-    | None -> Hashtbl.replace unique ~key:x ~data:(`Unique_in_a x's_pos_in_a)
-    | Some _ -> Hashtbl.replace unique ~key:x ~data:`Not_unique
+    | None -> Hashtbl.set unique ~key:x ~data:(`Unique_in_a x's_pos_in_a)
+    | Some _ -> Hashtbl.set unique ~key:x ~data:`Not_unique
   done;
 
   for x's_pos_in_b = blo to bhi - 1 do
@@ -186,10 +186,10 @@ let unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) =
       match pos with
       | `Not_unique -> ()
       | `Unique_in_a x's_pos_in_a ->
-          Hashtbl.replace unique
+          Hashtbl.set unique
             ~key:x ~data:(`Unique_in_a_b (x's_pos_in_a, x's_pos_in_b))
       | `Unique_in_a_b _ ->
-          Hashtbl.replace unique ~key:x ~data:`Not_unique);
+          Hashtbl.set unique ~key:x ~data:`Not_unique);
   done;
   let a_b =
     let unique = Hashtbl.filter_map unique ~f:(function
@@ -706,8 +706,8 @@ let merge ar =
       Array.iteri matches's ~f:(fun i matches ->
         List.iter matches ~f:(fun (a,b) ->
           match Hashtbl.find hashtbl a with
-          | None -> Hashtbl.replace hashtbl ~key:a ~data:[(i,b)]
-          | Some l -> Hashtbl.replace hashtbl ~key:a ~data:((i,b)::l)));
+          | None -> Hashtbl.set hashtbl ~key:a ~data:[(i,b)]
+          | Some l -> Hashtbl.set hashtbl ~key:a ~data:((i,b)::l)));
       let list =
         Hashtbl.to_alist hashtbl
         |! List.filter_map ~f:(fun (a,l) ->
