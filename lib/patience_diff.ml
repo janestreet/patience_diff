@@ -42,19 +42,19 @@ end = struct
   end
 
   module Piles = struct
-    type 'a t = 'a Pile.t Dequeue.t
+    type 'a t = 'a Pile.t Deque.t
 
-    let empty () : 'a t = Dequeue.create ~never_shrink:true ()
+    let empty () : 'a t = Deque.create ~never_shrink:true ()
 
     let get_ith_pile t i dir =
       let get index offset =
-        Option.bind (index t) (fun index -> Dequeue.get_opt t (index + offset))
+        Option.bind (index t) (fun index -> Deque.get_opt t (index + offset))
       in
       match dir with
-      | `From_left  -> get Dequeue.front_index i
-      | `From_right -> get Dequeue.back_index (-i)
+      | `From_left  -> get Deque.front_index i
+      | `From_right -> get Deque.back_index (-i)
 
-    let new_rightmost_pile t pile = Dequeue.enqueue_back t pile
+    let new_rightmost_pile t pile = Deque.enqueue_back t pile
   end
 
   module Backpointers = struct
@@ -97,7 +97,7 @@ end = struct
       if compare_top_values last_pile x_pile < 0 then None
       else
         (* do binary search *)
-        Dequeue.binary_search piles `First_strictly_greater_than x_pile
+        Deque.binary_search piles `First_strictly_greater_than x_pile
           ~compare:compare_top_values
     ;;
     (* [play_patience ar ~get_tag] plays patience with the greedy algorithm as described
@@ -115,7 +115,7 @@ end = struct
         let tagged_x = {Backpointers.value = x;tag = get_tag ~pile_opt ~piles} in
         match pile_opt with
         | None -> Piles.new_rightmost_pile piles (Pile.create tagged_x)
-        | Some i -> let pile = Dequeue.get piles i in Pile.put_on_top pile tagged_x
+        | Some i -> let pile = Deque.get piles i in Pile.put_on_top pile tagged_x
       );
       piles
   end

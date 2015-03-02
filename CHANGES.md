@@ -1,3 +1,7 @@
+## 112.24.00
+
+Update references to `Core.Std.Dequeue` to refer to `Core.Std.Deque`
+
 ## 111.25.00
 
 - refactoring and more unit tests
