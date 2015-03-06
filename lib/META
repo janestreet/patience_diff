@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: 1b21bd1f5c5c7673f09a16dbb161a601)
+version = "112.24.00"
+description = "Library implementing patience diff"
+requires = "core_kernel pa_pipebang sexplib"
+archive(byte) = "patience_diff_lib.cma"
+archive(byte, plugin) = "patience_diff_lib.cma"
+archive(native) = "patience_diff_lib.cmxa"
+archive(native, plugin) = "patience_diff_lib.cmxs"
+exists_if = "patience_diff_lib.cma"
+# OASIS_STOP
+
