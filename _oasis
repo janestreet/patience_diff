@@ -16,7 +16,7 @@ XStdFilesREADME:  false
 BuildTools:       ocamlbuild, camlp4o
 
 Library patience_diff_lib
-  Path:          lib
+  Path:          src
   Pack:          true
   FindlibName:   patience_diff
   Modules:       Patience_diff,
