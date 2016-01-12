@@ -1,25 +1,27 @@
 open Core_kernel.Std
 open Core_kernel.Std.Int.Replace_polymorphic_compare
 
-let ( <|> ) ar ij = if snd ij <= fst ij  then [||] else ar <|> ij
+let ( <|> ) ar (i,j) =
+  if j <= i then [||]
+  else Array.slice ar i j
 
 module Ordered_sequence : sig
-  type elt = int * int with compare
+  type elt = int * int [@@deriving compare]
   (* A [t] has its second coordinates in increasing order *)
-  type t = private elt array with sexp_of
+  type t = private elt array [@@deriving sexp_of]
 
   val create : (int * int) list -> t
 
   val is_empty : t -> bool
 end = struct
-  type elt = int * int with sexp_of
+  type elt = int * int [@@deriving sexp_of]
 
   let compare_elt = Comparable.lexicographic [
     (fun (_,y0) (_,y1) -> Int.compare y0 y1);
     (fun (x0,_) (x1,_) -> Int.compare x0 x1);
   ]
 
-  type t = elt array with sexp_of
+  type t = elt array [@@deriving sexp_of]
   let create l =
     let t = Array.of_list l in
     Array.sort t ~cmp:compare_elt;
@@ -273,16 +275,16 @@ let matches ~compare alpha bravo =
   List.rev !matches_ref
 ;;
 
-TEST_MODULE = struct
+let%test_module _ = (module struct
 
-  TEST_UNIT =
+  let%test_unit _ =
     let check a b ~expect =
-      <:test_result< (int * int) list >>
+      [%test_result: (int * int) list]
         (matches ~compare:Int.compare a b) ~expect
     in
     check [||] [||] ~expect:[];
     check [|0|] [|0|] ~expect:[0,0];
-    check [|0;1;1;2|] [|3;1;4;5|] ~expect:[1,1]; (* Needs the plain diff section *)
+    check [|0;1;1;2|] [|3;1;4;5|] ~expect:[1,1] (* Needs the plain diff section *)
   ;;
 
   let rec is_increasing a = function
@@ -298,22 +300,22 @@ TEST_MODULE = struct
     then ()
     else
       failwiths "invariant failure" (a, b)
-        <:sexp_of< (int * int) list * (int*int) list >>
+        [%sexp_of: (int * int) list * (int*int) list]
   ;;
 
-  TEST_UNIT =
-    check_lis [(2,0);(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)];
+  let%test_unit _ =
+    check_lis [(2,0);(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)]
   ;;
 
-  TEST_UNIT =
-    check_lis [(0,0);(2,0);(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)];
+  let%test_unit _ =
+    check_lis [(0,0);(2,0);(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)]
   ;;
 
-  TEST_UNIT =
-    check_lis [(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)];
+  let%test_unit _ =
+    check_lis [(5,1);(6,2);(3,3);(0,4);(4,5);(1,6)]
   ;;
 
-  TEST_UNIT =
+  let%test_unit _ =
     let check a b =
       let matches = matches ~compare:Int.compare a b in
       if is_increasing (-1) (List.map matches ~f:fst)
@@ -321,11 +323,11 @@ TEST_MODULE = struct
       then ()
       else
         failwiths "invariant failure" (a, b, matches)
-          <:sexp_of< int array * int array * (int*int) list >>
+          [%sexp_of: int array * int array * (int*int) list]
     in
     check [|0;1;2;3;4;5;6|] [|2;5;6;3;0;4;1|]
   ;;
-end
+end)
 
 module Matching_block = struct
   type t = {
@@ -400,7 +402,7 @@ module Range = struct
   | New of 'a array
   | Replace of 'a array * 'a array
   | Unified of 'a array
-  with sexp
+  [@@deriving sexp]
   let all_same ranges =
     List.for_all ranges ~f:(fun range ->
       match range with
@@ -693,7 +695,7 @@ type 'a segment =
 type 'a merged_array = 'a segment list
 
 let array_mapi2 ar1 ar2 ~f =
-  Array.combine ar1 ar2
+  Array.zip_exn ar1 ar2
                        |! Array.mapi ~f:(fun i (x,y) -> f i x y)
 
 let merge ar =
