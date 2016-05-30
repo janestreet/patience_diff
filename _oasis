@@ -2,7 +2,7 @@ OASISFormat:           0.4
 OCamlVersion:          >= 4.02.3
 FindlibVersion:        >= 1.3.2
 Name:                  patience_diff
-Version:               113.43+70
+Version:               113.44+128
 Synopsis:              Diff library using Bram Cohen's patience diff algorithm.
 Authors:               Jane Street Group, LLC <opensource@janestreet.com>
 Copyrights:            (C) 2009-2016 Jane Street Group LLC <opensource@janestreet.com>
@@ -31,6 +31,7 @@ Library patience_diff_lib
                 ppx_assert.runtime-lib,
                 ppx_bench.runtime-lib,
                 ppx_expect.collector,
+                ppx_hash.runtime-lib,
                 ppx_inline_test.runtime-lib,
                 sexplib,
                 typerep,
