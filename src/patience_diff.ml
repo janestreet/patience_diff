@@ -39,7 +39,7 @@ end = struct
   module Pile = struct
     type 'a t = 'a Stack.t
     let create x = let t = Stack.create () in Stack.push t x; t
-    let top t = Stack.top t |! Option.value_exn
+    let top t = Stack.top t |> Option.value_exn
     let put_on_top t x = Stack.push t x
   end
 
@@ -127,13 +127,13 @@ end = struct
       let module P = Play_patience in
       let get_tag ~pile_opt ~piles =
         match pile_opt with
-        | None -> Piles.get_ith_pile piles 0 `From_right |! Option.map ~f:Pile.top
+        | None -> Piles.get_ith_pile piles 0 `From_right |> Option.map ~f:Pile.top
         | Some i ->
           if i = 0 then None
-          else Piles.get_ith_pile piles (i-1) `From_left |! Option.value_exn |! Pile.top |! Option.some
+          else Piles.get_ith_pile piles (i-1) `From_left |> Option.value_exn |> Pile.top |> Option.some
       in
       let piles = P.play_patience ar ~get_tag in
-      Piles.get_ith_pile piles 0 `From_right |! Option.value_exn |! Pile.top |!
+      Piles.get_ith_pile piles 0 `From_right |> Option.value_exn |> Pile.top |>
           Backpointers.to_list
     end
 end
@@ -184,7 +184,7 @@ let unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) =
 
   for x's_pos_in_b = blo to bhi - 1 do
     let x = bravo.(x's_pos_in_b) in
-    Hashtbl.find unique x |! Option.iter ~f:(fun pos ->
+    Hashtbl.find unique x |> Option.iter ~f:(fun pos ->
       match pos with
       | `Not_unique -> ()
       | `Unique_in_a x's_pos_in_a ->
@@ -227,7 +227,7 @@ let matches ~compare alpha bravo =
       let last_a_pos = ref (alo - 1) in
       let last_b_pos = ref (blo - 1) in
       unique_lcs (alpha,alo,ahi) (bravo,blo,bhi)
-      |! List.iter ~f:(fun (apos,bpos) ->
+      |> List.iter ~f:(fun (apos,bpos) ->
 (*           printf "found apos %d bpos %d\n%!" apos bpos; *)
            if !last_a_pos + 1 <> apos || !last_b_pos + 1 <> bpos
            then begin
@@ -385,7 +385,7 @@ let collapse_sequences matches =
 let get_matching_blocks ~transform ~compare ~mine ~other =
   let mine = Array.map mine ~f:transform in
   let other = Array.map other ~f:transform in
-  let matches = matches ~compare mine other |! collapse_sequences in
+  let matches = matches ~compare mine other |> collapse_sequences in
   let last_match = {
     Matching_block.
     mine_start = Array.length mine;
@@ -662,7 +662,7 @@ let ranges hunks =
   List.concat_map hunks ~f:(fun hunk -> hunk.Hunk.ranges)
 
 let ratio a b =
-  (matches ~compare:Pervasives.compare a b |! List.length |! ( * ) 2 |! float) /. (Array.length a + Array.length b |! float)
+  (matches ~compare:Pervasives.compare a b |> List.length |> ( * ) 2 |> float) /. (Array.length a + Array.length b |> float)
 
 let collapse_multi_sequences matches =
   let collapsed = ref [] in
@@ -674,17 +674,17 @@ let collapse_multi_sequences matches =
       begin
         if Array.for_all start ~f:Option.is_some && (
           List.mapi il ~f:(fun i x -> x = value_exn start.(i) + !length)
-        |! List.for_all ~f:(fun x -> x))
+        |> List.for_all ~f:(fun x -> x))
         then incr length
         else begin if Array.for_all start ~f:Option.is_some then
-          collapsed := ((Array.map start ~f:value_exn |! Array.to_list),
+          collapsed := ((Array.map start ~f:value_exn |> Array.to_list),
                        !length)::!collapsed;
         List.iteri il ~f:(fun i x -> start.(i) <- Some x);
         length := 1;
       end
     end);
     if Array.for_all start ~f:Option.is_some && !length <> 0 then
-      collapsed := ((Array.map start ~f:value_exn |! Array.to_list),!length) ::
+      collapsed := ((Array.map start ~f:value_exn |> Array.to_list),!length) ::
         !collapsed;
     List.rev !collapsed
 
@@ -696,7 +696,7 @@ type 'a merged_array = 'a segment list
 
 let array_mapi2 ar1 ar2 ~f =
   Array.zip_exn ar1 ar2
-                       |! Array.mapi ~f:(fun i (x,y) -> f i x y)
+                       |> Array.mapi ~f:(fun i (x,y) -> f i x y)
 
 let merge ar =
   if Array.length ar = 0 then [] else
@@ -712,11 +712,11 @@ let merge ar =
           | Some l -> Hashtbl.set hashtbl ~key:a ~data:((i,b)::l)));
       let list =
         Hashtbl.to_alist hashtbl
-        |! List.filter_map ~f:(fun (a,l) ->
+        |> List.filter_map ~f:(fun (a,l) ->
           if List.length l = len - 1
-          then Some (a::(List.sort l ~cmp:Pervasives.compare |! List.map ~f:snd))
+          then Some (a::(List.sort l ~cmp:Pervasives.compare |> List.map ~f:snd))
           else None)
-        |! List.sort ~cmp:Pervasives.compare
+        |> List.sort ~cmp:Pervasives.compare
       in
       let matching_blocks = collapse_multi_sequences list in
       let last_pos = Array.create ~len:(Array.length ar) 0 in
