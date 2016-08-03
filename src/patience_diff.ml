@@ -50,7 +50,7 @@ end = struct
 
     let get_ith_pile t i dir =
       let get index offset =
-        Option.bind (index t) (fun index -> Deque.get_opt t (index + offset))
+        Option.bind (index t) ~f:(fun index -> Deque.get_opt t (index + offset))
       in
       match dir with
       | `From_left  -> get Deque.front_index i
