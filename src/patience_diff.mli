@@ -38,122 +38,140 @@
     returns
     [(0, 0, 2), (3, 2, 2), (5, 4, 0)]
 *)
+
+open Core_kernel.Std
+
 module Matching_block : sig
-  type t = {
-    mine_start  : int;
-    other_start : int;
-    length      : int;
-  }
+  type t =
+    { mine_start  : int
+    ; other_start : int
+    ; length      : int
+    }
 end
 
-val get_matching_blocks :
-  transform: ('a -> 'b)
-  -> compare: ('b -> 'b -> int)
-  -> mine:'a array
-  -> other:'a array
-  -> Matching_block.t list
+(** For handling diffs abstractly.  A range is a subarray of the two original arrays with
+    a constructor defining its relationship to the two original arrays.  A [Same] range
+    contains a series of elements which can be found in both arrays.  A [New] range
+    contains elements found only in the new array, while an [Old] range contains elements
+    found only in the old array.
 
-(** [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that the
-    list is strictly increasing in both its first and second coordinates.  This is
-    essentially a "unfolded" version of what [get_matching_blocks] returns. Instead of
-    grouping the consecutive matching block using [length] this function would return all
-    the pairs (mine_start * other_start). *)
-val matches
-  : compare:('a -> 'a -> int)
-  -> 'a array
-  -> 'a array
-  -> (int * int) list
+    A [Replace] contains two arrays: elements in the first array are elements found only
+    in the original, old array which have been replaced by elements in the second array,
+    which are elements found only in the new array. *)
 
-val ratio : 'a array -> 'a array -> float
-
-(** For handling diffs abstractly.  A range is a subarray of the two original
-    arrays with a constructor defining its relationship to the two original
-    arrays.  A [Same] range contains a series of elements which can be found in
-    both arrays.  A [New] range contains elements found only in the new array,
-    while an [Old] range contains elements found only in the old array.
-
-    A [Replace] contains two arrays: elements in the first array are elements
-    found only in the original, old array which have been replaced by elements
-    in the second array, which are elements found only in the new array. *)
 module Range : sig
   type 'a t =
-      | Same of ('a * 'a) array
-      | Old of 'a array
-      | New of 'a array
-      | Replace of 'a array * 'a array
-      | Unified of 'a array
+    | Same of ('a * 'a) array
+    | Old of 'a array
+    | New of 'a array
+    | Replace of 'a array * 'a array
+    | Unified of 'a array
   [@@deriving sexp]
-  (** [ranges_all_same ranges] returns true if all [ranges] are Same *)
-  val all_same: 'a t list -> bool
 
-  (** [old_only hunks] drops all New ranges and converts all Replace
-      ranges to Old ranges. *)
-  val old_only: 'a t list -> 'a t list
+  (** [all_same ranges] returns true if all [ranges] are Same *)
+  val all_same : 'a t list -> bool
 
-  (** [new_only hunks] drops all Old ranges and converts all Replace
-    ranges to New ranges. *)
-  val new_only: 'a t list -> 'a t list
+  (** [old_only ranges] drops all New ranges and converts all Replace ranges to Old
+      ranges. *)
+  val old_only : 'a t list -> 'a t list
+
+  (** [new_only ranges] drops all Old ranges and converts all Replace ranges to New
+      ranges. *)
+  val new_only : 'a t list -> 'a t list
 end
 
-(** In diff terms, a hunk is a unit of consecutive ranges with some [Same]
-    context before and after [New], [Old], and [Replace] ranges.  Each
-    hunk contains information about the original arrays, specifically the
-    starting indexes and the number of elements in both arrays to which
-    the hunk refers.
+(** In diff terms, a hunk is a unit of consecutive ranges with some [Same] context before
+    and after [New], [Old], and [Replace] ranges.  Each hunk contains information about
+    the original arrays, specifically the starting indexes and the number of elements in
+    both arrays to which the hunk refers.
 
-    Furthermore, a diff is essentially a list of hunks.  The simplest case
-    is a diff with infinite context, consisting of exactly one hunk. *)
+    Furthermore, a diff is essentially a list of hunks.  The simplest case is a diff with
+    infinite context, consisting of exactly one hunk. *)
 module Hunk : sig
-  type 'a t = {
-    mine_start: int;
-    mine_size: int;
-    other_start: int;
-    other_size: int;
-    ranges: 'a Range.t list;
-  }
+  type 'a t =
+    { mine_start  : int
+    ; mine_size   : int
+    ; other_start : int
+    ; other_size  : int
+    ; ranges      : 'a Range.t list
+    }
+  [@@deriving sexp_of]
 
-  (** [all_same hunk] returns true if [hunk] contains only Same ranges. *)
-  val all_same: 'a t -> bool
+  (** [all_same t] returns true if [t] contains only Same ranges. *)
+  val all_same : 'a t -> bool
+
+  val print_ranges : string t -> unit
 end
 
+module Hunks : sig
+  type 'a t = 'a Hunk.t list
 
-(** [get_hunks a b ~context ~compare] will compare the arrays [a] and [b] using
-    [compare] and produce a list of hunks. (The hunks will contain Same ranges
-    of at most [context] elements.)  [context] defaults to infinity (producing a
-    singleton hunk list), [compare] defaults to polymorphic compare. *)
-val get_hunks :
-  transform: ('a -> 'b)
-  -> compare: ('b -> 'b -> int)
-  -> context: int
-  -> mine: 'a array
-  -> other: 'a array
-  -> 'a Hunk.t list
+  (** [unified t] converts all Replace ranges in [t] to an Old range followed by a New
+      range. *)
+  val unified : 'a t -> 'a t
 
-val print_ranges : string Hunk.t -> unit
+  (** [old_only t] drops all New ranges from [t] and converts all Replace ranges to Old
+      ranges. *)
+  val old_only : 'a t -> 'a t
 
-(** [get_status hunks] returns `Same if each hunk in [hunks] has only Same ranges. *)
-val all_same : 'a Hunk.t list -> bool
+  (** [new_only t] drops all Old ranges from [t] and converts all Replace ranges to New
+      ranges. *)
+  val new_only : 'a t -> 'a t
 
-(** [unified hunks] converts all Replace ranges in hunks to an Old range
-    followed by a New range. *)
-val unified : 'a Hunk.t list -> 'a Hunk.t list
+  (** [ranges t] concatenates all the ranges of all hunks together **)
+  val ranges : 'a t -> 'a Range.t list
+end
 
-(** [old_only hunks] drops all New ranges from hunks and converts all Replace
-    ranges to Old ranges. *)
-val old_only : 'a Hunk.t list -> 'a Hunk.t list
+module type S = sig
 
-(** [new_only hunks] drops all Old ranges from hunks and converts all Replace
-    ranges to New ranges. *)
-val new_only : 'a Hunk.t list -> 'a Hunk.t list
+  type elt
 
-(** [ranges hunks] concatenates all the ranges of all hunks together **)
-val ranges : 'a Hunk.t list -> 'a Range.t list
+  val get_matching_blocks
+    :  transform: ('a -> elt)
+    -> mine:'a array
+    -> other:'a array
+    -> Matching_block.t list
 
+  (** [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that
+      the list is strictly increasing in both its first and second coordinates.  This is
+      essentially a "unfolded" version of what [get_matching_blocks] returns. Instead of
+      grouping the consecutive matching block using [length] this function would return
+      all the pairs (mine_start * other_start). *)
+  val matches : elt array -> elt array -> (int * int) list
 
-type 'a segment =
+  (** [match_ratio ~compare a b] computes the ratio defined as:
+
+      {[
+        2 * len (matches a b) / (len a + len b)
+      ]}
+
+      It is an indication of how much alike a and b are.  A ratio closer to 1.0 will
+      indicate a number of matches close to the number of elements that can potentially
+      match, thus is a sign that a and b are very much alike.  On the other hand, a low
+      ratio means very little match. *)
+  val match_ratio : elt array -> elt array -> float
+
+  (** [get_hunks ~transform ~context ~mine ~other] will compare the arrays [mine] and
+      [other] and produce a list of hunks. (The hunks will contain Same ranges of at most
+      [context] elements.)  [context] defaults to infinity (producing a singleton hunk
+      list). *)
+  val get_hunks
+    :  transform: ('a -> elt)
+    -> context: int
+    -> mine: 'a array
+    -> other: 'a array
+    -> 'a Hunk.t list
+
+  type 'a segment =
     | Same of 'a array
     | Different of 'a array array
 
-type 'a merged_array = 'a segment list
+  type 'a merged_array = 'a segment list
 
-val merge : 'a array array -> 'a merged_array
+  val merge : elt array array -> elt merged_array
+end
+
+module Make(Elt : Hashtbl.Key) : S with type elt = Elt.t
+
+(* [String] uses String.compare *)
+module String : S with type elt = string
