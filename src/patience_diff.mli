@@ -99,8 +99,6 @@ module Hunk : sig
 
   (** [all_same t] returns true if [t] contains only Same ranges. *)
   val all_same : 'a t -> bool
-
-  val print_ranges : string t -> unit
 end
 
 module Hunks : sig
@@ -109,14 +107,6 @@ module Hunks : sig
   (** [unified t] converts all Replace ranges in [t] to an Old range followed by a New
       range. *)
   val unified : 'a t -> 'a t
-
-  (** [old_only t] drops all New ranges from [t] and converts all Replace ranges to Old
-      ranges. *)
-  val old_only : 'a t -> 'a t
-
-  (** [new_only t] drops all Old ranges from [t] and converts all Replace ranges to New
-      ranges. *)
-  val new_only : 'a t -> 'a t
 
   (** [ranges t] concatenates all the ranges of all hunks together **)
   val ranges : 'a t -> 'a Range.t list

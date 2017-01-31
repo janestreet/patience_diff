@@ -237,20 +237,6 @@ module Hunk = struct
     }
 
   let all_same hunk = Range.all_same hunk.ranges
-
-  (* Debug function.  Expose in the interface if needed. *)
-  let print_ranges t =
-    let module R = Range in
-    List.iter t.ranges ~f:(fun r ->
-      print_endline "";
-      let s = match r with
-        | R.Same ar -> sprintf "sam %i" (Array.length ar)
-        | R.Old _ -> "old"
-        | R.New ar -> sprintf "new %i" (Array.length ar)
-        | R.Replace _ -> "rep"
-        | R.Unified _ -> "uni"
-      in
-      printf "%s\n%!" s)
 end
 
 module Hunks = struct
@@ -269,26 +255,6 @@ module Hunks = struct
     let module R = Range in
     let f = function
       | R.Replace (l_range, r_range) -> [R.Old l_range; R.New r_range]
-      | range -> [range]
-    in
-    concat_map_ranges hunks ~f
-  ;;
-
-  let old_only hunks =
-    let module R = Range in
-    let f = function
-      | R.Replace (l_range, _) -> [R.Old l_range]
-      | R.New _ -> []
-      | range -> [range]
-    in
-    concat_map_ranges hunks ~f
-  ;;
-
-  let new_only hunks =
-    let module R = Range in
-    let f = function
-      | R.Replace (_, r_range) -> [R.New r_range]
-      | R.Old _ -> []
       | range -> [range]
     in
     concat_map_ranges hunks ~f
