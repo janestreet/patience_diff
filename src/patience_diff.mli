@@ -39,7 +39,7 @@
     [(0, 0, 2), (3, 2, 2), (5, 4, 0)]
 *)
 
-open Core_kernel.Std
+open Core_kernel
 
 module Matching_block : sig
   type t =

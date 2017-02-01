@@ -195,7 +195,7 @@ let f a b =
   let m = Array.length bi in
   diff_loop a ai b bi n m
 
-open Core_kernel.Std
+open Core_kernel
 
 let iter_matches ~f:ff a b =
   let d1, d2 = f a b in

@@ -1,5 +1,5 @@
-open Core_kernel.Std
-open Core_kernel.Std.Int.Replace_polymorphic_compare
+open Core_kernel
+open Core_kernel.Int.Replace_polymorphic_compare
 
 let ( <|> ) ar (i,j) =
   if j <= i then [||]
