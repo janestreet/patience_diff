@@ -2,3 +2,5 @@
  ((name patience_diff_lib)
   (public_name patience_diff)
   (libraries (core_kernel))))
+
+(jbuild_version jane_street)
