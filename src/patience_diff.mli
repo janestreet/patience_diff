@@ -78,6 +78,10 @@ module Range : sig
   (** [new_only ranges] drops all Old ranges and converts all Replace ranges to New
       ranges. *)
   val new_only : 'a t list -> 'a t list
+
+  (** Counts number of elements. *)
+  val mine_size : 'a t -> int
+  val other_size : 'a t -> int
 end
 
 (** In diff terms, a hunk is a unit of consecutive ranges with some [Same] context before
@@ -95,7 +99,7 @@ module Hunk : sig
     ; other_size  : int
     ; ranges      : 'a Range.t list
     }
-  [@@deriving sexp_of]
+  [@@deriving fields, sexp_of]
 
   (** [all_same t] returns true if [t] contains only Same ranges. *)
   val all_same : 'a t -> bool
@@ -110,6 +114,8 @@ module Hunks : sig
 
   (** [ranges t] concatenates all the ranges of all hunks together **)
   val ranges : 'a t -> 'a Range.t list
+
+  val concat_map_ranges : 'a t -> f : ('a Range.t -> 'b Range.t list) -> 'b t
 end
 
 module type S = sig

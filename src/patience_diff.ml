@@ -214,6 +214,19 @@ module Range = struct
     in
     List.concat_map ranges ~f
   ;;
+
+  let mine_size = function
+    | Unified lines | Replace (lines, _) | Old lines -> Array.length lines
+    | Same lines -> Array.length lines
+    | New _ -> 0
+  ;;
+
+  let other_size = function
+    | Unified lines | Replace (_, lines) | New lines -> Array.length lines
+    | Same lines -> Array.length lines
+    | Old _ -> 0
+  ;;
+
 end
 
 module Hunk = struct
@@ -224,7 +237,18 @@ module Hunk = struct
     ; other_size  : int
     ; ranges      : 'a Range.t list
     }
-  [@@deriving sexp_of]
+  [@@deriving fields, sexp_of]
+
+  let _invariant t = Invariant.invariant [%here] t [%sexp_of: _ t] (fun () ->
+    [%test_result: int]
+      (List.sum (module Int) t.ranges ~f:Range.mine_size)
+      ~expect:t.mine_size
+      ~message:"mine_size";
+    [%test_result: int]
+      (List.sum (module Int) t.ranges ~f:Range.other_size)
+      ~expect:t.other_size
+      ~message:"other_size")
+  ;;
 
   (* Does the nitty gritty of turning indexes into
      line numbers and reversing the ranges, returning a nice new hunk *)
@@ -237,19 +261,14 @@ module Hunk = struct
     }
 
   let all_same hunk = Range.all_same hunk.ranges
+
+  let concat_map t ~f = { t with ranges = List.concat_map t.ranges ~f }
 end
 
 module Hunks = struct
   type 'a t = 'a Hunk.t list
 
-  let concat_map_ranges hunks ~f =
-    let f hunk =
-      { hunk with
-        Hunk.ranges = List.concat_map hunk.Hunk.ranges ~f
-      }
-    in
-    List.map hunks ~f
-  ;;
+  let concat_map_ranges hunks ~f = List.map hunks ~f:(Hunk.concat_map ~f)
 
   let unified hunks =
     let module R = Range in
@@ -263,6 +282,7 @@ module Hunks = struct
   let ranges hunks =
     List.concat_map hunks ~f:(fun hunk -> hunk.Hunk.ranges)
   ;;
+
 end
 
 module type S = sig
