@@ -290,6 +290,7 @@ module type S = sig
 
   val get_matching_blocks
     :  transform: ('a -> elt)
+    -> ?big_enough:int
     -> mine:'a array
     -> other:'a array
     -> Matching_block.t list
@@ -301,6 +302,7 @@ module type S = sig
   val get_hunks
     :  transform: ('a -> elt)
     -> context: int
+    -> ?big_enough: int
     -> mine: 'a array
     -> other: 'a array
     -> 'a Hunk.t list
@@ -314,6 +316,22 @@ module type S = sig
   val merge : elt array array -> elt merged_array
 end
 
+(* Configurable parameters for [semantic_cleanup] and [unique_lcs], all chosen based
+   on empirical observation. *)
+(* This function is called on the edge case of semantic cleanup, when there's a change
+   that's exactly the same length as the size of the match.  If the insert on the other
+   side is a LOT larger than the match, it should be semantically cleaned up, but
+   most of the time it should be left alone. *)
+let should_discard_if_other_side_equal ~big_enough = 100 / big_enough
+
+(* These are the numerator and denominator of the cutoff for aborting the patience diff
+   algorithm in [unique_lcs].  (This will result in us using [Plain_diff] instead.)
+   Lowering [switch_to_plain_diff_numerator] / [switch_to_plain_diff_denominator]
+   makes us switch to plain diff less often.  The range of this cutoff is from 0 to 1,
+   where 0 means we always switch and 1 means we never switch. *)
+let switch_to_plain_diff_numerator = 1
+let switch_to_plain_diff_denominator = 10
+
 module Make (Elt : Hashtbl.Key) = struct
 
   module Table = Hashtbl.Make(Elt)
@@ -323,37 +341,67 @@ module Make (Elt : Hashtbl.Key) = struct
   (* This is an implementation of the patience diff algorithm by Bram Cohen as seen in
      Bazaar version 1.14.1 *)
 
+  module Line_metadata = struct
+    type t =
+      | Unique_in_a of { index_in_a: int }
+      | Unique_in_a_b of { index_in_a: int; index_in_b: int }
+      | Not_unique of { occurrences_in_a: int }
+  end
   let unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) =
     (* Create a hashtable which takes elements of a to their index in a iff they're
-       unique. *)
-    let unique = Table.create ~size:(Int.min (ahi - alo) (bhi - blo)) () in
+       unique. If an element is not unique, it takes it to its frequency in a. *)
+    let unique : (elt, Line_metadata.t) Table.hashtbl = Table.create ~size:(Int.min (ahi - alo) (bhi - blo)) () in
     for x's_pos_in_a = alo to ahi - 1 do
       let x = alpha.(x's_pos_in_a) in
       match Hashtbl.find unique x with
-      | None -> Hashtbl.set unique ~key:x ~data:(`Unique_in_a x's_pos_in_a)
-      | Some _ -> Hashtbl.set unique ~key:x ~data:`Not_unique
+      | None ->
+        Hashtbl.set unique ~key:x ~data:(Unique_in_a { index_in_a = x's_pos_in_a });
+      | Some Unique_in_a _ ->
+        Hashtbl.set unique ~key:x ~data:(Not_unique {occurrences_in_a = 2});
+      | Some Not_unique {occurrences_in_a = n} ->
+        Hashtbl.set unique ~key:x ~data:(Not_unique {occurrences_in_a = n + 1});
+        (* This case doesn't occur until the second pass through [unique] *)
+      | Some Unique_in_a_b _ -> assert false;
     done;
-
+    (* [num_pairs] is the size of the list we use for Longest Increasing Subsequence.
+       [intersection_size] is the number of tokens in the intersection of the two
+       sequences, with multiplicity, and is an upper bound on the size of the LCS. *)
+    let num_pairs = ref 0 in
+    let intersection_size = ref 0 in
     for x's_pos_in_b = blo to bhi - 1 do
       let x = bravo.(x's_pos_in_b) in
       Hashtbl.find unique x |> Option.iter ~f:(fun pos ->
         match pos with
-        | `Not_unique -> ()
-        | `Unique_in_a x's_pos_in_a ->
+        | Not_unique { occurrences_in_a = n} ->
+          if n > 0 then begin
+            Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = n - 1});
+            incr intersection_size;
+          end
+        | Unique_in_a { index_in_a = x's_pos_in_a } ->
+          incr num_pairs;
+          incr intersection_size;
           Hashtbl.set unique
-            ~key:x ~data:(`Unique_in_a_b (x's_pos_in_a, x's_pos_in_b))
-        | `Unique_in_a_b _ ->
-          Hashtbl.set unique ~key:x ~data:`Not_unique);
+            ~key:x
+            ~data:(Unique_in_a_b {index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
+        | Unique_in_a_b _ ->
+          decr num_pairs;
+          Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }));
     done;
-    let a_b =
-      let unique = Hashtbl.filter_map unique ~f:(function
-        | `Not_unique
-        | `Unique_in_a _ -> None
-        | `Unique_in_a_b pos_in_a_b -> Some pos_in_a_b)
+    (* If we're ignoring almost all of the text when we perform the patience
+       diff algorithm, it will often give bad results. *)
+    if !num_pairs * switch_to_plain_diff_denominator
+       < !intersection_size * switch_to_plain_diff_numerator
+    then `Not_enough_unique_tokens
+    else
+      let a_b =
+        let unique = Hashtbl.filter_map unique ~f:(function
+          | Not_unique _
+          | Unique_in_a _ -> None
+          | Unique_in_a_b { index_in_a = i_a; index_in_b = i_b } -> Some (i_a, i_b))
+        in
+        Ordered_sequence.create (Hashtbl.data unique)
       in
-      Ordered_sequence.create (Hashtbl.data unique)
-    in
-    Patience.longest_increasing_subsequence a_b
+      `Computed_lcs (Patience.longest_increasing_subsequence a_b)
   ;;
 
   (* [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that
@@ -377,22 +425,7 @@ module Make (Elt : Hashtbl.Key) = struct
       (*    printf "alo %d blo %d ahi %d bhi %d\n%!" alo blo ahi bhi; *)
       let old_length = !matches_ref_length in
       if not (alo >= ahi || blo >= bhi) then begin
-        let last_a_pos = ref (alo - 1) in
-        let last_b_pos = ref (blo - 1) in
-        unique_lcs (alpha,alo,ahi) (bravo,blo,bhi)
-        |> List.iter ~f:(fun (apos,bpos) ->
-          (*           printf "found apos %d bpos %d\n%!" apos bpos; *)
-          if !last_a_pos + 1 <> apos || !last_b_pos + 1 <> bpos
-          then begin
-            (*printf "recurse last_a_pos %d last_b_pos %d\n%!" !last_a_pos !last_b_pos;*)
-            recurse_matches (!last_a_pos + 1) (!last_b_pos + 1) apos bpos;
-          end;
-          last_a_pos := apos;
-          last_b_pos := bpos;
-          add_match (apos,bpos));
-        if !matches_ref_length > old_length
-        then recurse_matches (!last_a_pos+1) (!last_b_pos+1) ahi bhi
-        else if (Elt.compare alpha.(alo) bravo.(blo) = 0)
+        if (Elt.compare alpha.(alo) bravo.(blo) = 0)
         then
           begin
             let alo = ref alo in
@@ -416,16 +449,34 @@ module Make (Elt : Hashtbl.Key) = struct
             do
               decr nahi; decr nbhi;
             done;
-            recurse_matches (!last_a_pos+1) (!last_b_pos+1) !nahi !nbhi;
+            recurse_matches alo blo !nahi !nbhi;
             for i = 0 to (ahi - !nahi - 1) do
               add_match (!nahi + i,!nbhi + i)
             done;
           end
         else
-          Plain_diff.iter_matches
-            (Array.sub alpha ~pos:alo ~len:(ahi - alo))
-            (Array.sub bravo ~pos:blo ~len:(bhi - blo))
-            ~f:(fun (i1, i2) -> add_match (alo + i1, blo + i2))
+          let last_a_pos = ref (alo - 1) in
+          let last_b_pos = ref (blo - 1) in
+          let plain_diff () =
+            Plain_diff.iter_matches
+              (Array.sub alpha ~pos:alo ~len:(ahi - alo))
+              (Array.sub bravo ~pos:blo ~len:(bhi - blo))
+              ~f:(fun (i1, i2) -> add_match (alo + i1, blo + i2))
+          in
+          match unique_lcs (alpha,alo,ahi) (bravo,blo,bhi) with
+          | `Not_enough_unique_tokens -> plain_diff ();
+          | `Computed_lcs lcs ->
+            lcs |> List.iter ~f:(fun (apos,bpos) ->
+              if !last_a_pos + 1 <> apos || !last_b_pos + 1 <> bpos
+              then begin
+                recurse_matches (!last_a_pos + 1) (!last_b_pos + 1) apos bpos;
+              end;
+              last_a_pos := apos;
+              last_b_pos := bpos;
+              add_match (apos,bpos));
+            if !matches_ref_length > old_length (* Did unique_lcs find anything at all? *)
+            then recurse_matches (!last_a_pos+1) (!last_b_pos+1) ahi bhi
+            else plain_diff ();
       end
     in
     recurse_matches 0 0 (Array.length alpha) (Array.length bravo);
@@ -476,10 +527,178 @@ module Make (Elt : Hashtbl.Key) = struct
     end;
     List.rev !collapsed
 
-  let get_matching_blocks ~transform ~mine ~other =
+
+
+  (* Given that there's an insert/delete of size [left_change] to the left, and
+     an insert/delete of size [right_change] to the right, should we keep
+     this block of length [block_len] in our list of matches, or discard it? *)
+  let should_discard_match ~big_enough ~left_change ~right_change ~block_len =
+    (* Throw away if its effective length is too small,
+       relative to its surrounding inserts / deletes. *)
+    block_len < big_enough &&
+    ((left_change > block_len && right_change > block_len)
+     || (left_change >= block_len + (should_discard_if_other_side_equal ~big_enough)
+         && right_change = block_len)
+     || (right_change >= block_len + (should_discard_if_other_side_equal ~big_enough)
+         && left_change = block_len))
+
+  let change_between left_matching_block right_matching_block =
+    let module M = Matching_block in
+    max
+      (right_matching_block.M.mine_start  - left_matching_block.M.mine_start )
+      (right_matching_block.M.other_start - left_matching_block.M.other_start)
+    - left_matching_block.M.length
+
+  (* See the "Semantic Chaff" section of https://neil.fraser.name/writing/diff/ *)
+  let basic_semantic_cleanup ~big_enough matching_blocks =
+    if big_enough <= 1
+    then matching_blocks
+    else
+      let module M = Matching_block in
+      match matching_blocks with
+      | [] -> []
+      | first_block :: other_blocks ->
+        let (final_ans, final_pending) =
+          List.fold other_blocks
+            ~init:  ([] , first_block)
+            ~f:(fun (ans, pending) current_block ->
+              let rec loop ans pending =
+                match ans with
+                | [] -> (ans, pending)
+                | hd :: tl ->
+                  if should_discard_match ~big_enough
+                       ~left_change: (change_between hd pending)
+                       ~right_change: (change_between pending current_block)
+                       ~block_len: pending.M.length
+                  then loop tl hd
+                  else (ans, pending)
+              in
+              let (updated_ans, updated_pending) = loop ans pending in
+              updated_pending :: updated_ans, current_block
+            )
+        in
+        List.rev (final_pending :: final_ans)
+
+  (* Attempts to eliminate the "tunnel vision" problem described in the
+     "Semantic Chaff" section of https://neil.fraser.name/writing/diff/.
+     To do this, we go through each pair of consecutive matches
+     and pretend to combine them into one match.  If that match would
+     be deleted by [basic_semantic_cleanup], we delete both. *)
+  let advanced_semantic_cleanup ~big_enough matching_blocks =
+    if big_enough <= 1
+    then matching_blocks
+    else
+      let module M = Matching_block in
+      match matching_blocks with
+      | [] -> []
+      | first_block :: [] -> [first_block]
+      | first_block :: second_block :: other_blocks ->
+        let (final_ans, final_pendingA, final_pendingB) =
+          List.fold other_blocks
+            ~init:  ([] , first_block, second_block)
+            ~f:(fun (ans, pendingA, pendingB) current_block ->
+              let rec loop ans pendingA pendingB =
+                match ans with
+                | [] -> (ans, pendingA, pendingB)
+                | hd :: tl ->
+                  if should_discard_match ~big_enough
+                       ~left_change: (change_between hd pendingA)
+                       ~right_change: (change_between pendingB current_block)
+                       ~block_len: (pendingB.M.length +
+                                    min
+                                      (pendingB.M.mine_start  - pendingA.M.mine_start)
+                                      (pendingB.M.other_start - pendingA.M.other_start))
+                  then loop tl hd pendingA
+                  else (ans, pendingA, pendingB)
+              in
+              let (updated_ans, updated_pendingA, updated_pendingB) =
+                loop ans pendingA pendingB
+              in
+              (updated_pendingA :: updated_ans, updated_pendingB, current_block)
+            )
+        in
+        List.rev (final_pendingB :: final_pendingA :: final_ans)
+        (* The loop above only deleted the second element of each pair we're supposed to
+           delete.  This call to [basic_semantic_cleanup] is guaranteed to finish the job
+           by deleting the remaining element of those pairs. *)
+        |> basic_semantic_cleanup ~big_enough
+
+  (* Goal: eliminate small, semantically meaningless matches. *)
+  let semantic_cleanup ~big_enough matching_blocks =
+    basic_semantic_cleanup ~big_enough matching_blocks
+    |> advanced_semantic_cleanup ~big_enough
+
+  (* When we have a choice, we'd prefer one block of equality to two.
+     For example, instead of A <insert>B A</insert> C D E F, we prefer
+     <insert>A B</insert> A C D E F.  There are two reasons:
+
+     (1) A is usually something like "let", and so the second version is more
+     semantically accurate
+     (2) Semantic cleanup may delete the lone A match, but it will not delete
+     the A C D E F match). So by moving the A match, we've also saved it. *)
+  let combine_equalities ~mine ~other ~matches =
+    let module M = Matching_block in
+    match matches with
+    | [] -> []
+    | first_block :: tl ->
+      List.fold tl
+        ~init:  ([], first_block)
+        ~f:(fun (ans, pending) block ->
+          let rec loop ans ~pending ~new_block =
+            if pending.M.length = 0
+            then (ans, pending, new_block)
+            else
+              let advance_in_mine =
+                Elt.compare
+                  mine.(pending.M.mine_start + pending.M.length - 1)
+                  mine.(new_block.M.mine_start - 1)
+                = 0
+              in
+              let advance_in_other = (
+                Elt.compare
+                  other.(pending.M.other_start + pending.M.length - 1)
+                  other.(new_block.M.other_start - 1)
+                = 0)
+              in
+              if advance_in_mine && advance_in_other
+              then loop ans
+                     ~pending:{M.
+                                mine_start = pending.M.mine_start;
+                                other_start = pending.M.other_start;
+                                length = pending.M.length - 1;
+                              }
+                     ~new_block:{M.
+                                  mine_start = new_block.M.mine_start - 1;
+                                  other_start = new_block.M.other_start - 1;
+                                  length = new_block.M.length + 1;
+                                }
+              else (ans, pending, new_block)
+          in
+          let (updated_ans, updated_pending, updated_new_block)
+            = loop ans ~pending ~new_block:block
+          in
+          (* In the original Google heuristic, we would either move all or none
+             of pending.  But because it might start with an unmatched `Newline(0, None),
+             we are fine with moving all but one token of it. *)
+          if updated_pending.M.length = 0 || updated_pending.M.length = 1
+          then
+            let new_ans =
+              if updated_pending.M.length = 0
+              then updated_ans
+              else updated_pending :: updated_ans
+            in
+            (new_ans, updated_new_block)
+          else
+            (* Do nothing *)
+            (pending :: ans, block)
+        )
+      |> (fun (ans, pending) -> List.rev (pending :: ans))
+
+  let get_matching_blocks ~transform ?(big_enough = 1) ~mine ~other =
     let mine = Array.map mine ~f:transform in
     let other = Array.map other ~f:transform in
     let matches = matches mine other |> collapse_sequences in
+    let matches = combine_equalities ~mine ~other ~matches in
     let last_match =
       { Matching_block.
         mine_start  = Array.length mine
@@ -488,8 +707,9 @@ module Make (Elt : Hashtbl.Key) = struct
       }
     in
     List.append matches [last_match]
+    |> semantic_cleanup ~big_enough
 
-  let get_ranges_rev ~transform ~mine ~other =
+  let get_ranges_rev ~transform ~big_enough ~mine ~other =
     let module R = Range in
     let module M = Matching_block in
     let rec aux matching_blocks i j l =
@@ -534,11 +754,12 @@ module Make (Elt : Hashtbl.Key) = struct
         )
       | [] -> List.rev l
     in
-    let matching_blocks = get_matching_blocks ~transform ~mine ~other in
+    let matching_blocks = get_matching_blocks ~transform ~big_enough ~mine ~other
+    in
     aux matching_blocks 0 0 []
 
-  let get_hunks ~transform ~context ~mine ~other =
-    let ranges = get_ranges_rev ~transform ~mine ~other in
+  let get_hunks ~transform ~context ?(big_enough = 1) ~mine ~other =
+    let ranges = get_ranges_rev ~transform ~big_enough ~mine ~other in
     let module R = Range in
     let a = mine in
     let b = other in
