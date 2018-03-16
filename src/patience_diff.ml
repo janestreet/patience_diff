@@ -24,7 +24,7 @@ end = struct
   type t = elt array [@@deriving sexp_of]
   let create l =
     let t = Array.of_list l in
-    Array.sort t ~cmp:compare_elt;
+    Array.sort t ~compare:compare_elt;
     t
 
   let is_empty = Array.is_empty
@@ -917,9 +917,9 @@ module Make (Elt : Hashtbl.Key) = struct
         Hashtbl.to_alist hashtbl
         |> List.filter_map ~f:(fun (a,l) ->
           if List.length l = len - 1
-          then Some (a::(List.sort l ~cmp:compare_int_pair |> List.map ~f:snd))
+          then Some (a::(List.sort l ~compare:compare_int_pair |> List.map ~f:snd))
           else None)
-        |> List.sort ~cmp:(List.compare Int.compare)
+        |> List.sort ~compare:(List.compare Int.compare)
       in
       let matching_blocks = collapse_multi_sequences list in
       let last_pos = Array.create ~len:(Array.length ar) 0 in

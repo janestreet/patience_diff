@@ -164,8 +164,8 @@ let make_indexer a b = begin
   let htb = Hashtbl.create (10 * Array.length b) in
   Array.iteri
     (fun i e ->
-       try b.(i) <- Hashtbl.find htb e with
-         Not_found -> Hashtbl.add htb e e)
+       try b.(i) <- Hashtbl.find htb e
+       with Base.Not_found_s _ | Not_found -> Hashtbl.add htb e e)
     b;
   let ai = Array.make n 0 in
   let k =
@@ -180,7 +180,7 @@ let make_indexer a b = begin
             k + 1
           end
           with
-            Not_found -> k
+          | Base.Not_found_s _ | Not_found -> k
         in
         loop (i + 1) k
     in loop 0 0

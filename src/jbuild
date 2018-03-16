@@ -3,7 +3,7 @@
   (public_name patience_diff)
   (flags (:standard -safe-string))
   (libraries (core_kernel))
-  (preprocess (pps (ppx_jane ppx_driver.runner)))))
+  (preprocess (pps (ppx_jane ppxlib.runner)))))
 
 
 (jbuild_version 1)
