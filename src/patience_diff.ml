@@ -459,6 +459,7 @@ module Make (Elt : Hashtbl.Key) = struct
           let last_b_pos = ref (blo - 1) in
           let plain_diff () =
             Plain_diff.iter_matches
+              ~hashable:(module Elt)
               (Array.sub alpha ~pos:alo ~len:(ahi - alo))
               (Array.sub bravo ~pos:blo ~len:(bhi - blo))
               ~f:(fun (i1, i2) -> add_match (alo + i1, blo + i2))

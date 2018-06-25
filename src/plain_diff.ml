@@ -35,6 +35,8 @@
    algorithm described by Eugene W.Myers in: "An O(ND) Difference Algorithm and Its
    Variations" *)
 
+open Base
+
 exception DiagReturn of int
 
 let diag fd bd sh xv yv xoff xlim yoff ylim = begin
@@ -64,7 +66,7 @@ let diag fd bd sh xv yv xoff xlim yoff ylim = begin
             let x = if tlo >= thi then tlo + 1 else thi in
             let x =
               let rec loop xv yv xlim ylim x y =
-                if x < xlim && y < ylim && xv x == yv y then
+                if x < xlim && y < ylim && phys_equal (xv x) (yv y) then
                   loop xv yv xlim ylim (x + 1) (y + 1)
                 else x
               in
@@ -78,11 +80,11 @@ let diag fd bd sh xv yv xoff xlim yoff ylim = begin
         in loop fmax
       end;
       let bmin =
-        if bmin > dmin then begin bd.(sh+bmin-2) <- max_int; bmin - 1 end
+        if bmin > dmin then begin bd.(sh+bmin-2) <- Int.max_value; bmin - 1 end
         else bmin + 1
       in
       let bmax =
-        if bmax < dmax then begin bd.(sh+bmax+2) <- max_int; bmax + 1 end
+        if bmax < dmax then begin bd.(sh+bmax+2) <- Int.max_value; bmax + 1 end
         else bmax - 1
       in
       begin
@@ -94,7 +96,7 @@ let diag fd bd sh xv yv xoff xlim yoff ylim = begin
             let x = if tlo < thi then tlo else thi - 1 in
             let x =
               let rec loop xv yv xoff yoff x y =
-                if x > xoff && y > yoff && xv (x - 1) == yv (y - 1) then
+                if x > xoff && y > yoff && phys_equal (xv (x - 1)) (yv (y - 1)) then
                   loop xv yv xoff yoff (x - 1) (y - 1)
                 else x
               in
@@ -115,26 +117,26 @@ let diag fd bd sh xv yv xoff xlim yoff ylim = begin
 end
 
 let diff_loop a ai b bi n m = begin
-  let fd = Array.make (n + m + 3) 0 in
-  let bd = Array.make (n + m + 3) 0 in
+  let fd = Array.create ~len:(n + m + 3) 0 in
+  let bd = Array.create ~len:(n + m + 3) 0 in
   let sh = m + 1 in
   let xvec i = a.(ai.(i)) in
   let yvec j = b.(bi.(j)) in
-  let chng1 = Array.make (Array.length a) true in
-  let chng2 = Array.make (Array.length b) true in
+  let chng1 = Array.create ~len:(Array.length a) true in
+  let chng2 = Array.create ~len:(Array.length b) true in
   for i = 0 to n - 1 do chng1.(ai.(i)) <- false done;
   for j = 0 to m - 1 do chng2.(bi.(j)) <- false done;
   let rec loop xoff xlim yoff ylim =
     let (xoff, yoff) =
       let rec loop xoff yoff =
-        if xoff < xlim && yoff < ylim && xvec xoff == yvec yoff then
+        if xoff < xlim && yoff < ylim && phys_equal (xvec xoff) (yvec yoff) then
           loop (xoff + 1) (yoff + 1)
         else (xoff, yoff)
       in loop xoff yoff
     in
     let (xlim, ylim) =
       let rec loop xlim ylim =
-        if xlim > xoff && ylim > yoff && xvec (xlim - 1) == yvec (ylim - 1)
+        if xlim > xoff && ylim > yoff && phys_equal (xvec (xlim - 1)) (yvec (ylim - 1))
         then
           loop (xlim - 1) (ylim - 1)
         else (xlim, ylim)
@@ -159,46 +161,46 @@ end
    improves the speed much.  The same time, this function updates the items of so that all
    equal items point to the same unique item. All items comparisons in the main algorithm
    can therefore be done with [==] instead of [=], what can improve speed much. *)
-let make_indexer a b = begin
+let make_indexer hashable a b = begin
   let n = Array.length a in
-  let htb = Hashtbl.create (10 * Array.length b) in
+  let htb = Hashtbl.create hashable ~size:(10 * Array.length b) in
   Array.iteri
-    (fun i e ->
-       try b.(i) <- Hashtbl.find htb e
-       with Base.Not_found_s _ | Not_found -> Hashtbl.add htb e e)
+    ~f:(fun i e ->
+      match Hashtbl.find htb e with
+      | Some v ->
+        b.(i) <- v
+      | None ->
+        Hashtbl.add_exn htb ~key:e ~data:e)
     b;
-  let ai = Array.make n 0 in
+  let ai = Array.create ~len:n 0 in
   let k =
     let rec loop i k =
       if i = n then k
       else
         let k =
-          try begin
-            a.(i) <- Hashtbl.find htb a.(i);
-            (* line found (since "Not_found" not raised) *)
+          match Hashtbl.find htb a.(i) with
+          | Some v ->
+            a.(i) <- v;
             ai.(k) <- i;
             k + 1
-          end
-          with
-          | Base.Not_found_s _ | Not_found -> k
+          | None ->
+            k
         in
         loop (i + 1) k
     in loop 0 0
   in
-  Array.sub ai 0 k
+  Array.sub ai ~pos:0 ~len:k
 end
 
-let f a b =
-  let ai = make_indexer a b in
-  let bi = make_indexer b a in
+let f ~hashable a b =
+  let ai = make_indexer hashable a b in
+  let bi = make_indexer hashable b a in
   let n = Array.length ai in
   let m = Array.length bi in
   diff_loop a ai b bi n m
 
-open Core_kernel
-
-let iter_matches ~f:ff a b =
-  let d1, d2 = f a b in
+let iter_matches ~f:ff ~hashable a b =
+  let d1, d2 = f ~hashable a b in
   let rec aux i1 i2 =
     if i1 >= Array.length d1 || i2 >= Array.length d2 then ()
     else
