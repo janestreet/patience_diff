@@ -43,9 +43,9 @@ open Core_kernel
 
 module Matching_block : sig
   type t =
-    { mine_start  : int
+    { mine_start : int
     ; other_start : int
-    ; length      : int
+    ; length : int
     }
 end
 
@@ -58,6 +58,7 @@ end
     A [Replace] contains two arrays: elements in the first array are elements found only
     in the original, old array which have been replaced by elements in the second array,
     which are elements found only in the new array. *)
+
 
 module Range : sig
   type 'a t =
@@ -81,6 +82,7 @@ module Range : sig
 
   (** Counts number of elements. *)
   val mine_size : 'a t -> int
+
   val other_size : 'a t -> int
 end
 
@@ -93,11 +95,11 @@ end
     infinite context, consisting of exactly one hunk. *)
 module Hunk : sig
   type 'a t =
-    { mine_start  : int
-    ; mine_size   : int
+    { mine_start : int
+    ; mine_size : int
     ; other_start : int
-    ; other_size  : int
-    ; ranges      : 'a Range.t list
+    ; other_size : int
+    ; ranges : 'a Range.t list
     }
   [@@deriving fields, sexp_of]
 
@@ -115,11 +117,10 @@ module Hunks : sig
   (** [ranges t] concatenates all the ranges of all hunks together **)
   val ranges : 'a t -> 'a Range.t list
 
-  val concat_map_ranges : 'a t -> f : ('a Range.t -> 'b Range.t list) -> 'b t
+  val concat_map_ranges : 'a t -> f:('a Range.t -> 'b Range.t list) -> 'b t
 end
 
 module type S = sig
-
   type elt
 
   (** Get_matching_blocks not only aggregates the data from [matches a b] but also
@@ -127,8 +128,8 @@ module type S = sig
       The value of [big_enough] governs how aggressively we do so.  See [get_hunks]
       below for more details. *)
   val get_matching_blocks
-    :  transform: ('a -> elt)
-    -> ?big_enough: int
+    :  transform:('a -> elt)
+    -> ?big_enough:int
     -> mine:'a array
     -> other:'a array
     -> Matching_block.t list
@@ -162,11 +163,11 @@ module type S = sig
       When this function is called by [Patdiff_core], the value of [big_enough] is 3 at
       the line level, and 7 at the word level. *)
   val get_hunks
-    :  transform: ('a -> elt)
-    -> context: int
-    -> ?big_enough: int
-    -> mine: 'a array
-    -> other: 'a array
+    :  transform:('a -> elt)
+    -> context:int
+    -> ?big_enough:int
+    -> mine:'a array
+    -> other:'a array
     -> 'a Hunk.t list
 
   type 'a segment =
@@ -178,7 +179,8 @@ module type S = sig
   val merge : elt array array -> elt merged_array
 end
 
-module Make(Elt : Hashtbl.Key) : S with type elt = Elt.t
+module Make (Elt : Hashtbl.Key) : S with type elt = Elt.t
 
 (* [String] uses String.compare *)
+
 module String : S with type elt = string
