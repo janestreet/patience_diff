@@ -155,9 +155,9 @@ module type S = sig
 
   (** [get_hunks ~transform ~context ~mine ~other] will compare the arrays [mine] and
       [other] and produce a list of hunks. (The hunks will contain Same ranges of at most
-      [context] elements.)  [context] defaults to infinity (producing a singleton hunk
-      list).  The value of [big_enough] governs how aggressively we try to clean up
-      spurious matches, by restricting our attention to only matches of length
+      [context] elements.)  Negative [context] is equivalent to infinity (producing a
+      singleton hunk list).  The value of [big_enough] governs how aggressively we try to
+      clean up spurious matches, by restricting our attention to only matches of length
       less than [big_enough].  Thus, setting [big_enough] to a higher value results in
       more aggressive cleanup, and the default value of 1 results in no cleanup at all.
       When this function is called by [Patdiff_core], the value of [big_enough] is 3 at
