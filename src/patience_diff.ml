@@ -11,7 +11,6 @@ module Ordered_sequence : sig
   type t = private elt array [@@deriving sexp_of]
 
   val create : (int * int) list -> t
-
   val is_empty : t -> bool
 end = struct
   type elt = int * int [@@deriving sexp_of]
@@ -49,7 +48,6 @@ end = struct
     ;;
 
     let top t = Stack.top t |> Option.value_exn
-
     let put_on_top t x = Stack.push t x
   end
 
@@ -243,13 +241,17 @@ module Range = struct
   ;;
 
   let mine_size = function
-    | Unified lines | Replace (lines, _) | Old lines -> Array.length lines
+    | Unified lines
+    | Replace (lines, _)
+    | Old lines -> Array.length lines
     | Same lines -> Array.length lines
     | New _ -> 0
   ;;
 
   let other_size = function
-    | Unified lines | Replace (_, lines) | New lines -> Array.length lines
+    | Unified lines
+    | Replace (_, lines)
+    | New lines -> Array.length lines
     | Same lines -> Array.length lines
     | Old _ -> 0
   ;;
@@ -289,7 +291,6 @@ module Hunk = struct
   ;;
 
   let all_same hunk = Range.all_same hunk.ranges
-
   let concat_map t ~f = { t with ranges = List.concat_map t.ranges ~f }
 end
 
@@ -321,7 +322,6 @@ module type S = sig
     -> Matching_block.t list
 
   val matches : elt array -> elt array -> (int * int) list
-
   val match_ratio : elt array -> elt array -> float
 
   val get_hunks
@@ -355,7 +355,6 @@ let should_discard_if_other_side_equal ~big_enough = 100 / big_enough
    makes us switch to plain diff less often.  The range of this cutoff is from 0 to 1,
    where 0 means we always switch and 1 means we never switch. *)
 let switch_to_plain_diff_numerator = 1
-
 let switch_to_plain_diff_denominator = 10
 
 module Make (Elt : Hashtbl.Key) = struct
@@ -416,8 +415,7 @@ module Make (Elt : Hashtbl.Key) = struct
             unique
             ~key:x
             ~data:
-              (Unique_in_a_b
-                 { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
+              (Unique_in_a_b { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
         | Unique_in_a_b _ ->
           decr num_pairs;
           Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }))
@@ -540,7 +538,8 @@ module Make (Elt : Hashtbl.Key) = struct
         start_b := Some i_b;
         length := 1);
     (match !start_a, !start_b with
-     | Some start_a_val, Some start_b_val when !length <> 0 ->
+     | Some start_a_val, Some start_b_val
+       when !length <> 0 ->
        let matching_block =
          { Matching_block.mine_start = start_a_val
          ; other_start = start_b_val
@@ -560,10 +559,10 @@ module Make (Elt : Hashtbl.Key) = struct
        relative to its surrounding inserts / deletes. *)
     block_len < big_enough
     && ((left_change > block_len && right_change > block_len)
-        || left_change >= block_len + should_discard_if_other_side_equal ~big_enough
-           && right_change = block_len
-        || right_change >= block_len + should_discard_if_other_side_equal ~big_enough
-           && left_change = block_len)
+        || (left_change >= block_len + should_discard_if_other_side_equal ~big_enough
+            && right_change = block_len)
+        || (right_change >= block_len + should_discard_if_other_side_equal ~big_enough
+            && left_change = block_len))
   ;;
 
   let change_between left_matching_block right_matching_block =
@@ -724,7 +723,7 @@ module Make (Elt : Hashtbl.Key) = struct
       |> fun (ans, pending) -> List.rev (pending :: ans)
   ;;
 
-  let get_matching_blocks ~transform ?(big_enough=1) ~mine ~other =
+  let get_matching_blocks ~transform ?(big_enough = 1) ~mine ~other =
     let mine = Array.map mine ~f:transform in
     let other = Array.map other ~f:transform in
     let matches = matches mine other |> collapse_sequences in
@@ -789,7 +788,7 @@ module Make (Elt : Hashtbl.Key) = struct
     aux matching_blocks 0 0 []
   ;;
 
-  let get_hunks ~transform ~context ?(big_enough=1) ~mine ~other =
+  let get_hunks ~transform ~context ?(big_enough = 1) ~mine ~other =
     let ranges = get_ranges_rev ~transform ~big_enough ~mine ~other in
     let module R = Range in
     let a = mine in
@@ -862,7 +861,8 @@ module Make (Elt : Hashtbl.Key) = struct
             match range with
             | R.Same _ -> (* We eliminate the possibility of a Same above *)
               assert false
-            | R.Unified _ -> (* get_ranges_rev never returns a Unified range *)
+            | R.Unified _ ->
+              (* get_ranges_rev never returns a Unified range *)
               assert false
             | R.New range ->
               let stop = bhi + Array.length range in
@@ -893,7 +893,7 @@ module Make (Elt : Hashtbl.Key) = struct
   ;;
 
   let match_ratio a b =
-    (matches a b |> List.length |> (( * ) 2) |> float)
+    (matches a b |> List.length |> ( * ) 2 |> float)
     /. (Array.length a + Array.length b |> float)
   ;;
 
@@ -919,7 +919,8 @@ module Make (Elt : Hashtbl.Key) = struct
           length := 1));
       if Array.for_all start ~f:Option.is_some && !length <> 0
       then
-        collapsed := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
+        collapsed :=
+          (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
       List.rev !collapsed)
   ;;
 
@@ -972,14 +973,14 @@ module Make (Elt : Hashtbl.Key) = struct
 end
 
 let%test_module _ =
-  ( module struct
+  (module struct
     module P = Make (Int)
 
     let%test_unit _ =
       let check a b ~expect = [%test_result: (int * int) list] (P.matches a b) ~expect in
       check [||] [||] ~expect:[];
-      check [|0|] [|0|] ~expect:[ 0, 0 ];
-      check [|0; 1; 1; 2|] [|3; 1; 4; 5|] ~expect:[ 1, 1 ]
+      check [| 0 |] [| 0 |] ~expect:[ 0, 0 ];
+      check [| 0; 1; 1; 2 |] [| 3; 1; 4; 5 |] ~expect:[ 1, 1 ]
     ;;
 
     (* Needs the plain diff section *)
@@ -1001,9 +1002,7 @@ let%test_module _ =
     ;;
 
     let%test_unit _ = check_lis [ 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
-
     let%test_unit _ = check_lis [ 0, 0; 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
-
     let%test_unit _ = check_lis [ 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
 
     let%test_unit _ =
@@ -1018,9 +1017,9 @@ let%test_module _ =
             (a, b, matches)
             [%sexp_of: int array * int array * (int * int) list]
       in
-      check [|0; 1; 2; 3; 4; 5; 6|] [|2; 5; 6; 3; 0; 4; 1|]
+      check [| 0; 1; 2; 3; 4; 5; 6 |] [| 2; 5; 6; 3; 0; 4; 1 |]
     ;;
-  end )
+  end)
 ;;
 
 module String = Make (String)

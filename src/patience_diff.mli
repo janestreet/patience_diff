@@ -59,7 +59,6 @@ end
     in the original, old array which have been replaced by elements in the second array,
     which are elements found only in the new array. *)
 
-
 module Range : sig
   type 'a t =
     | Same of ('a * 'a) array
@@ -182,5 +181,4 @@ end
 module Make (Elt : Hashtbl.Key) : S with type elt = Elt.t
 
 (* [String] uses String.compare *)
-
 module String : S with type elt = string
