@@ -43,27 +43,33 @@ open Core_kernel
 
 module Matching_block : sig
   type t =
-    { mine_start : int
-    ; other_start : int
+    { prev_start : int
+    ; next_start : int
     ; length : int
     }
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving sexp, bin_io]
+    end
+  end
 end
 
 (** For handling diffs abstractly.  A range is a subarray of the two original arrays with
     a constructor defining its relationship to the two original arrays.  A [Same] range
-    contains a series of elements which can be found in both arrays.  A [New] range
-    contains elements found only in the new array, while an [Old] range contains elements
-    found only in the old array.
+    contains a series of elements which can be found in both arrays.  A [Next] range
+    contains elements found only in the second array, while an [Prev] range contains
+    elements found only in the first array.
 
-    A [Replace] contains two arrays: elements in the first array are elements found only
-    in the original, old array which have been replaced by elements in the second array,
-    which are elements found only in the new array. *)
+    A [Replace] contains two arrays: elements in the first output array are elements found
+    only in the first input array, which have been replaced by elements in the second
+    output array, which are elements found only in the second input array. *)
 
 module Range : sig
   type 'a t =
     | Same of ('a * 'a) array
-    | Old of 'a array
-    | New of 'a array
+    | Prev of 'a array
+    | Next of 'a array
     | Replace of 'a array * 'a array
     | Unified of 'a array
   [@@deriving sexp]
@@ -71,22 +77,28 @@ module Range : sig
   (** [all_same ranges] returns true if all [ranges] are Same *)
   val all_same : 'a t list -> bool
 
-  (** [old_only ranges] drops all New ranges and converts all Replace ranges to Old
+  (** [prev_only ranges] drops all Next ranges and converts all Replace ranges to Prev
       ranges. *)
-  val old_only : 'a t list -> 'a t list
+  val prev_only : 'a t list -> 'a t list
 
-  (** [new_only ranges] drops all Old ranges and converts all Replace ranges to New
+  (** [next_only ranges] drops all Prev ranges and converts all Replace ranges to Next
       ranges. *)
-  val new_only : 'a t list -> 'a t list
+  val next_only : 'a t list -> 'a t list
 
   (** Counts number of elements. *)
-  val mine_size : 'a t -> int
+  val prev_size : 'a t -> int
 
-  val other_size : 'a t -> int
+  val next_size : 'a t -> int
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec 'a t = 'a t [@@deriving sexp, bin_io]
+    end
+  end
 end
 
 (** In diff terms, a hunk is a unit of consecutive ranges with some [Same] context before
-    and after [New], [Old], and [Replace] ranges.  Each hunk contains information about
+    and after [Next], [Prev], and [Replace] ranges.  Each hunk contains information about
     the original arrays, specifically the starting indexes and the number of elements in
     both arrays to which the hunk refers.
 
@@ -94,22 +106,28 @@ end
     infinite context, consisting of exactly one hunk. *)
 module Hunk : sig
   type 'a t =
-    { mine_start : int
-    ; mine_size : int
-    ; other_start : int
-    ; other_size : int
+    { prev_start : int
+    ; prev_size : int
+    ; next_start : int
+    ; next_size : int
     ; ranges : 'a Range.t list
     }
   [@@deriving fields, sexp_of]
 
   (** [all_same t] returns true if [t] contains only Same ranges. *)
   val all_same : 'a t -> bool
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec 'a t = 'a t [@@deriving sexp, bin_io]
+    end
+  end
 end
 
 module Hunks : sig
   type 'a t = 'a Hunk.t list
 
-  (** [unified t] converts all Replace ranges in [t] to an Old range followed by a New
+  (** [unified t] converts all Replace ranges in [t] to an Prev range followed by a Next
       range. *)
   val unified : 'a t -> 'a t
 
@@ -117,6 +135,12 @@ module Hunks : sig
   val ranges : 'a t -> 'a Range.t list
 
   val concat_map_ranges : 'a t -> f:('a Range.t -> 'b Range.t list) -> 'b t
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec 'a t = 'a t [@@deriving sexp, bin_io]
+    end
+  end
 end
 
 module type S = sig
@@ -129,15 +153,15 @@ module type S = sig
   val get_matching_blocks
     :  transform:('a -> elt)
     -> ?big_enough:int
-    -> mine:'a array
-    -> other:'a array
+    -> prev:'a array
+    -> next:'a array
     -> Matching_block.t list
 
   (** [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that
       the list is strictly increasing in both its first and second coordinates.  This is
       essentially a "unfolded" version of what [get_matching_blocks] returns. Instead of
       grouping the consecutive matching block using [length] this function would return
-      all the pairs (mine_start * other_start). *)
+      all the pairs (prev_start * next_start). *)
   val matches : elt array -> elt array -> (int * int) list
 
   (** [match_ratio ~compare a b] computes the ratio defined as:
@@ -148,12 +172,12 @@ module type S = sig
 
       It is an indication of how much alike a and b are.  A ratio closer to 1.0 will
       indicate a number of matches close to the number of elements that can potentially
-      match, thus is a sign that a and b are very much alike.  On the other hand, a low
+      match, thus is a sign that a and b are very much alike.  On the next hand, a low
       ratio means very little match. *)
   val match_ratio : elt array -> elt array -> float
 
-  (** [get_hunks ~transform ~context ~mine ~other] will compare the arrays [mine] and
-      [other] and produce a list of hunks. (The hunks will contain Same ranges of at most
+  (** [get_hunks ~transform ~context ~prev ~next] will compare the arrays [prev] and
+      [next] and produce a list of hunks. (The hunks will contain Same ranges of at most
       [context] elements.)  Negative [context] is equivalent to infinity (producing a
       singleton hunk list).  The value of [big_enough] governs how aggressively we try to
       clean up spurious matches, by restricting our attention to only matches of length
@@ -165,8 +189,8 @@ module type S = sig
     :  transform:('a -> elt)
     -> context:int
     -> ?big_enough:int
-    -> mine:'a array
-    -> other:'a array
+    -> prev:'a array
+    -> next:'a array
     -> 'a Hunk.t list
 
   type 'a segment =
@@ -182,3 +206,10 @@ module Make (Elt : Hashtbl.Key) : S with type elt = Elt.t
 
 (* [String] uses String.compare *)
 module String : S with type elt = string
+
+module Stable : sig
+  module Matching_block = Matching_block.Stable
+  module Range = Range.Stable
+  module Hunk = Hunk.Stable
+  module Hunks = Hunks.Stable
+end
