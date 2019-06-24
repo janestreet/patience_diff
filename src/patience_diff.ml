@@ -254,17 +254,13 @@ module Range = struct
   ;;
 
   let prev_size = function
-    | Unified lines
-    | Replace (lines, _)
-    | Prev lines -> Array.length lines
+    | Unified lines | Replace (lines, _) | Prev lines -> Array.length lines
     | Same lines -> Array.length lines
     | Next _ -> 0
   ;;
 
   let next_size = function
-    | Unified lines
-    | Replace (_, lines)
-    | Next lines -> Array.length lines
+    | Unified lines | Replace (_, lines) | Next lines -> Array.length lines
     | Same lines -> Array.length lines
     | Prev _ -> 0
   ;;
@@ -440,7 +436,8 @@ module Make (Elt : Hashtbl.Key) = struct
             unique
             ~key:x
             ~data:
-              (Unique_in_a_b { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
+              (Unique_in_a_b
+                 { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
         | Unique_in_a_b _ ->
           decr num_pairs;
           Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }))
@@ -563,8 +560,7 @@ module Make (Elt : Hashtbl.Key) = struct
         start_b := Some i_b;
         length := 1);
     (match !start_a, !start_b with
-     | Some start_a_val, Some start_b_val
-       when !length <> 0 ->
+     | Some start_a_val, Some start_b_val when !length <> 0 ->
        let matching_block =
          { Matching_block.prev_start = start_a_val
          ; next_start = start_b_val
@@ -884,7 +880,8 @@ module Make (Elt : Hashtbl.Key) = struct
           (* rest could be anything, so extract hunk_info from range *)
           let ahi, bhi =
             match range with
-            | R.Same _ -> (* We eliminate the possibility of a Same above *)
+            | R.Same _ ->
+              (* We eliminate the possibility of a Same above *)
               assert false
             | R.Unified _ ->
               (* get_ranges_rev never returns a Unified range *)
@@ -938,14 +935,14 @@ module Make (Elt : Hashtbl.Key) = struct
         else (
           if Array.for_all start ~f:Option.is_some
           then
-            collapsed :=
-              (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
+            collapsed
+            := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
           List.iteri il ~f:(fun i x -> start.(i) <- Some x);
           length := 1));
       if Array.for_all start ~f:Option.is_some && !length <> 0
       then
-        collapsed :=
-          (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
+        collapsed
+        := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
       List.rev !collapsed)
   ;;
 
@@ -988,9 +985,9 @@ module Make (Elt : Hashtbl.Key) = struct
         let ar' = Array.of_list l in
         if Array.compare Int.compare last_pos ar' <> 0
         then
-          merged_array :=
-            Different (array_mapi2 last_pos ar' ~f:(fun i n m -> ar.(i) <|> (n, m)))
-            :: !merged_array;
+          merged_array
+          := Different (array_mapi2 last_pos ar' ~f:(fun i n m -> ar.(i) <|> (n, m)))
+             :: !merged_array;
         merged_array := Same (ar.(0) <|> (ar'.(0), ar'.(0) + len)) :: !merged_array;
         Array.iteri last_pos ~f:(fun i _ -> last_pos.(i) <- ar'.(i) + len));
       List.rev !merged_array)

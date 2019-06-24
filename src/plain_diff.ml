@@ -75,7 +75,8 @@ end
    If we return the "wrong" partitions, the worst this can do is cause suboptimal diff
    output. It cannot cause incorrect diff output. *)
 let diag ~fd ~bd ~sh ~xv ~yv ~xoff ~xlim ~yoff ~ylim ~too_expensive ~find_minimal
-  : Partition.t =
+  : Partition.t
+  =
   let dmin = xoff - ylim (* minimum valid diagonal *) in
   let dmax = xlim - yoff (* maximum valid diagonal *) in
   let fmid = xoff - yoff (* center diagonal of forward search *) in
@@ -158,14 +159,14 @@ let diag ~fd ~bd ~sh ~xv ~yv ~xoff ~xlim ~yoff ~ylim ~too_expensive ~find_minima
              loop ~xv ~yv ~xoff ~yoff ~x ~y:(x - d)
            in
            bd.(sh + d) <- x;
-           if not odd && fmin <= d && d <= fmax && bd.(sh + d) <= fd.(sh + d)
+           if (not odd) && fmin <= d && d <= fmax && bd.(sh + d) <= fd.(sh + d)
            then return { xmid = x; ymid = y; lo_minimal = true; hi_minimal = true }
            else loop (d - 2))
        in
        loop bmax);
       (* Heuristic: if we've gone well beyond the call of duty, give up and report halfway
          between our best results so far. *)
-      if not find_minimal && c >= too_expensive
+      if (not find_minimal) && c >= too_expensive
       then (
         (* Find forward diagonal that maximizes [x + y]. *)
         let fxybest, fxbest =
