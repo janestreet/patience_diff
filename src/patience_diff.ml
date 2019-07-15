@@ -389,7 +389,10 @@ module Make (Elt : Hashtbl.Key) = struct
   module Line_metadata = struct
     type t =
       | Unique_in_a of { index_in_a : int }
-      | Unique_in_a_b of { index_in_a : int; index_in_b : int }
+      | Unique_in_a_b of
+          { index_in_a : int
+          ; index_in_b : int
+          }
       | Not_unique of { occurrences_in_a : int }
   end
 
