@@ -97,7 +97,6 @@ end = struct
       -> Ordered_sequence.elt Backpointers.t Piles.t
   end = struct
     let optimized_findi_from_left piles x =
-      let ( >>= ) = Option.( >>= ) in
       (* first see if any work *)
       let last_pile = Piles.get_ith_pile piles 0 `From_right in
       (* [x_pile] is a dummy pile just used for comparisons *)
@@ -106,8 +105,7 @@ end = struct
         let top pile = fst (Pile.top pile).Backpointers.value in
         Int.compare (top pile1) (top pile2)
       in
-      last_pile
-      >>= fun last_pile ->
+      let%bind.Option.Let_syntax last_pile = last_pile in
       if compare_top_values last_pile x_pile < 0
       then None
       else
@@ -321,9 +319,8 @@ module Hunks = struct
   let concat_map_ranges hunks ~f = List.map hunks ~f:(Hunk.concat_map ~f)
 
   let unified hunks =
-    let module R = Range in
-    let f = function
-      | R.Replace (l_range, r_range) -> [ R.Prev l_range; R.Next r_range ]
+    let f : 'a Range.t -> 'a Range.t list = function
+      | Replace (l_range, r_range) -> [ Prev l_range; Next r_range ]
       | range -> [ range ]
     in
     concat_map_ranges hunks ~f
@@ -589,20 +586,21 @@ module Make (Elt : Hashtbl.Key) = struct
             && left_change = block_len))
   ;;
 
-  let change_between left_matching_block right_matching_block =
-    let module M = Matching_block in
+  let change_between
+        (left_matching_block : Matching_block.t)
+        (right_matching_block : Matching_block.t)
+    =
     max
-      (right_matching_block.M.prev_start - left_matching_block.M.prev_start)
-      (right_matching_block.M.next_start - left_matching_block.M.next_start)
-    - left_matching_block.M.length
+      (right_matching_block.prev_start - left_matching_block.prev_start)
+      (right_matching_block.next_start - left_matching_block.next_start)
+    - left_matching_block.length
   ;;
 
   (* See the "Semantic Chaff" section of https://neil.fraser.name/writing/diff/ *)
   let basic_semantic_cleanup ~big_enough matching_blocks =
     if big_enough <= 1
     then matching_blocks
-    else
-      let module M = Matching_block in
+    else (
       match matching_blocks with
       | [] -> []
       | first_block :: other_blocks ->
@@ -619,14 +617,14 @@ module Make (Elt : Hashtbl.Key) = struct
                        ~big_enough
                        ~left_change:(change_between hd pending)
                        ~right_change:(change_between pending current_block)
-                       ~block_len:pending.M.length
+                       ~block_len:pending.length
                   then loop tl hd
                   else ans, pending
               in
               let updated_ans, updated_pending = loop ans pending in
               updated_pending :: updated_ans, current_block)
         in
-        List.rev (final_pending :: final_ans)
+        List.rev (final_pending :: final_ans))
   ;;
 
   (* Attempts to eliminate the "tunnel vision" problem described in the
@@ -637,8 +635,7 @@ module Make (Elt : Hashtbl.Key) = struct
   let advanced_semantic_cleanup ~big_enough matching_blocks =
     if big_enough <= 1
     then matching_blocks
-    else
-      let module M = Matching_block in
+    else (
       match matching_blocks with
       | [] -> []
       | [ first_block ] -> [ first_block ]
@@ -657,10 +654,10 @@ module Make (Elt : Hashtbl.Key) = struct
                        ~left_change:(change_between hd pendingA)
                        ~right_change:(change_between pendingB current_block)
                        ~block_len:
-                         (pendingB.M.length
+                         (pendingB.length
                           + min
-                              (pendingB.M.prev_start - pendingA.M.prev_start)
-                              (pendingB.M.next_start - pendingA.M.next_start))
+                              (pendingB.prev_start - pendingA.prev_start)
+                              (pendingB.next_start - pendingA.next_start))
                   then loop tl hd pendingA
                   else ans, pendingA, pendingB
               in
@@ -673,7 +670,7 @@ module Make (Elt : Hashtbl.Key) = struct
         (* The loop above only deleted the second element of each pair we're supposed to
            delete.  This call to [basic_semantic_cleanup] is guaranteed to finish the job
            by deleting the remaining element of those pairs. *)
-        |> basic_semantic_cleanup ~big_enough
+        |> basic_semantic_cleanup ~big_enough)
   ;;
 
   (* Goal: eliminate small, semantically meaningless matches. *)
@@ -691,25 +688,24 @@ module Make (Elt : Hashtbl.Key) = struct
      (2) Semantic cleanup may delete the lone A match, but it will not delete
      the A C D E F match). So by moving the A match, we've also saved it. *)
   let combine_equalities ~prev ~next ~matches =
-    let module M = Matching_block in
     match matches with
     | [] -> []
     | first_block :: tl ->
       List.fold tl ~init:([], first_block) ~f:(fun (ans, pending) block ->
-        let rec loop ans ~pending ~new_block =
-          if pending.M.length = 0
+        let rec loop ans ~(pending : Matching_block.t) ~(new_block : Matching_block.t) =
+          if pending.length = 0
           then ans, pending, new_block
           else (
             let advance_in_prev =
               Elt.compare
-                prev.(pending.M.prev_start + pending.M.length - 1)
-                prev.(new_block.M.prev_start - 1)
+                prev.(pending.prev_start + pending.length - 1)
+                prev.(new_block.prev_start - 1)
               = 0
             in
             let advance_in_next =
               Elt.compare
-                next.(pending.M.next_start + pending.M.length - 1)
-                next.(new_block.M.next_start - 1)
+                next.(pending.next_start + pending.length - 1)
+                next.(new_block.next_start - 1)
               = 0
             in
             if advance_in_prev && advance_in_next
@@ -717,14 +713,14 @@ module Make (Elt : Hashtbl.Key) = struct
               loop
                 ans
                 ~pending:
-                  { M.prev_start = pending.M.prev_start
-                  ; next_start = pending.M.next_start
-                  ; length = pending.M.length - 1
+                  { prev_start = pending.prev_start
+                  ; next_start = pending.next_start
+                  ; length = pending.length - 1
                   }
                 ~new_block:
-                  { M.prev_start = new_block.M.prev_start - 1
-                  ; next_start = new_block.M.next_start - 1
-                  ; length = new_block.M.length + 1
+                  { prev_start = new_block.prev_start - 1
+                  ; next_start = new_block.next_start - 1
+                  ; length = new_block.length + 1
                   }
             else ans, pending, new_block)
         in
@@ -734,10 +730,10 @@ module Make (Elt : Hashtbl.Key) = struct
         (* In the original Google heuristic, we would either move all or none
            of pending.  But because it might start with an unmatched `Newline(0, None),
            we are fine with moving all but one token of it. *)
-        if updated_pending.M.length = 0 || updated_pending.M.length = 1
+        if updated_pending.length = 0 || updated_pending.length = 1
         then (
           let new_ans =
-            if updated_pending.M.length = 0
+            if updated_pending.length = 0
             then updated_ans
             else updated_pending :: updated_ans
           in
@@ -762,32 +758,30 @@ module Make (Elt : Hashtbl.Key) = struct
   ;;
 
   let get_ranges_rev ~transform ~big_enough ~prev ~next =
-    let module R = Range in
-    let module M = Matching_block in
-    let rec aux matching_blocks i j l =
+    let rec aux (matching_blocks : Matching_block.t list) i j l : _ Range.t list =
       match matching_blocks with
       | current_block :: remaining_blocks ->
         let prev_index, next_index, size =
-          current_block.M.prev_start, current_block.M.next_start, current_block.M.length
+          current_block.prev_start, current_block.next_start, current_block.length
         in
         (* Throw away crossover matches *)
         if prev_index < i || next_index < j
         then aux remaining_blocks i j l
         else (
-          let range_opt =
+          let range_opt : _ Range.t option =
             if i < prev_index && j < next_index
             then (
               let prev_range = prev <|> (i, prev_index) in
               let next_range = next <|> (j, next_index) in
-              Some (R.Replace (prev_range, next_range)))
+              Some (Replace (prev_range, next_range)))
             else if i < prev_index
             then (
               let prev_range = prev <|> (i, prev_index) in
-              Some (R.Prev prev_range))
+              Some (Prev prev_range))
             else if j < next_index
             then (
               let next_range = next <|> (j, next_index) in
-              Some (R.Next next_range))
+              Some (Next next_range))
             else None
           in
           let l =
@@ -803,7 +797,7 @@ module Make (Elt : Hashtbl.Key) = struct
               let prev_range = prev <|> (prev_index, prev_stop) in
               let next_range = next <|> (next_index, next_stop) in
               let range = Array.map2_exn prev_range next_range ~f:(fun x y -> x, y) in
-              R.Same range :: l)
+              Same range :: l)
           in
           aux remaining_blocks prev_stop next_stop l)
       | [] -> List.rev l
@@ -814,7 +808,6 @@ module Make (Elt : Hashtbl.Key) = struct
 
   let get_hunks ~transform ~context ?(big_enough = 1) ~prev ~next =
     let ranges = get_ranges_rev ~transform ~big_enough ~prev ~next in
-    let module R = Range in
     let a = prev in
     let b = next in
     if context < 0
@@ -825,7 +818,7 @@ module Make (Elt : Hashtbl.Key) = struct
       [ singleton_hunk ])
     else (
       let rec aux ranges_remaining curr_ranges alo ahi blo bhi acc_hunks =
-        match ranges_remaining with
+        match (ranges_remaining : _ Range.t list) with
         | [] ->
           (* Finish the last hunk *)
           let new_hunk = Hunk.create alo ahi blo bhi curr_ranges in
@@ -833,10 +826,10 @@ module Make (Elt : Hashtbl.Key) = struct
           let acc_hunks = new_hunk :: acc_hunks in
           (* Finished! Return the accumulator *)
           List.rev acc_hunks
-        | [ R.Same range ] ->
+        | [ Same range ] ->
           (* If the last range is a Same, we might need to crop to context. *)
           let stop = min (Array.length range) context in
-          let new_range = R.Same (range <|> (0, stop)) in
+          let new_range = Range.Same (range <|> (0, stop)) in
           let curr_ranges = new_range :: curr_ranges in
           (* Finish the current hunk *)
           let ahi = ahi + stop in
@@ -846,12 +839,12 @@ module Make (Elt : Hashtbl.Key) = struct
           let acc_hunks = new_hunk :: acc_hunks in
           (* Finished! Return the accumulator *)
           List.rev acc_hunks
-        | R.Same range :: rest ->
+        | Same range :: rest ->
           let size = Array.length range in
           if size > context * 2
           then (
             (* If this Same range is sufficiently large, split off a new hunk *)
-            let new_range = R.Same (range <|> (0, context)) in
+            let new_range = Range.Same (range <|> (0, context)) in
             let curr_ranges = new_range :: curr_ranges in
             (* Advance both hi's by context *)
             let ahi = ahi + context in
@@ -866,13 +859,13 @@ module Make (Elt : Hashtbl.Key) = struct
             let blo = bhi + size - (2 * context) in
             let bhi = blo in
             (* Push the remainder of the Equal range back onto the remaining_ranges *)
-            let rest = R.Same (range <|> (size - context, size)) :: rest in
+            let rest = Range.Same (range <|> (size - context, size)) :: rest in
             aux rest [] alo ahi blo bhi acc_hunks)
           else (
             (* Otherwise, this range is small enough that it qualifies as context for
                the both the previous and forthcoming range, so simply add it to
                curr_ranges untouched *)
-            let curr_ranges = R.Same range :: curr_ranges in
+            let curr_ranges = Range.Same range :: curr_ranges in
             let ahi = ahi + size in
             let bhi = bhi + size in
             aux rest curr_ranges alo ahi blo bhi acc_hunks)
@@ -883,19 +876,19 @@ module Make (Elt : Hashtbl.Key) = struct
           (* rest could be anything, so extract hunk_info from range *)
           let ahi, bhi =
             match range with
-            | R.Same _ ->
+            | Same _ ->
               (* We eliminate the possibility of a Same above *)
               assert false
-            | R.Unified _ ->
+            | Unified _ ->
               (* get_ranges_rev never returns a Unified range *)
               assert false
-            | R.Next range ->
+            | Next range ->
               let stop = bhi + Array.length range in
               ahi, stop
-            | R.Prev range ->
+            | Prev range ->
               let stop = ahi + Array.length range in
               stop, bhi
-            | R.Replace (a_range, b_range) ->
+            | Replace (a_range, b_range) ->
               let prev_stop = ahi + Array.length a_range in
               let next_stop = bhi + Array.length b_range in
               prev_stop, next_stop
@@ -907,10 +900,10 @@ module Make (Elt : Hashtbl.Key) = struct
         (* If the first range is an Equal, shave off the front of the range, according to
            context.  Keep it on the ranges list so hunk construction can see where the range
            begins *)
-        | R.Same range :: rest ->
+        | Same range :: rest ->
           let stop = Array.length range in
           let start = max 0 (stop - context) in
-          let new_range = R.Same (range <|> (start, stop)) in
+          let new_range = Range.Same (range <|> (start, stop)) in
           new_range :: rest, start, start, start, start
         | rest -> rest, 0, 0, 0, 0
       in

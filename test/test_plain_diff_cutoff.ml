@@ -10,7 +10,7 @@ let%expect_test "exercise cutoff code path" =
       arr1
       arr2
       ~f:(fun (i, j) ->
-        assert (Int.( = ) arr1.(i) arr2.(j));
+        assert (arr1.(i) = arr2.(j));
         print_s [%sexp (arr1.(i) : int), (i, j : int * int)])
       ~hashable:(module Int)
   in
