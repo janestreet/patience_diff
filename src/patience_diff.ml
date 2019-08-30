@@ -105,7 +105,7 @@ end = struct
         let top pile = fst (Pile.top pile).Backpointers.value in
         Int.compare (top pile1) (top pile2)
       in
-      let%bind.Option.Let_syntax last_pile = last_pile in
+      let%bind.Option last_pile = last_pile in
       if compare_top_values last_pile x_pile < 0
       then None
       else
