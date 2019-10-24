@@ -14,7 +14,7 @@ depends: [
   "base"
   "core_kernel"
   "ppx_jane"
-  "dune"        {build & >= "1.5.1"}
+  "dune"        {>= "1.5.1"}
 ]
 synopsis: "Diff library using Bram Cohen's patience diff algorithm"
 description: "
