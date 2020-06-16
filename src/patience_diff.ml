@@ -1,7 +1,23 @@
-open Core_kernel
-open Core_kernel.Int.Replace_polymorphic_compare
+open! Core_kernel
+include Patience_diff_intf
+module Hunk = Hunk
+module Hunks = Hunks
+module Matching_block = Matching_block
+module Range = Range
 
 let ( <|> ) ar (i, j) = if j <= i then [||] else Array.slice ar i j
+
+(* Does the nitty gritty of turning indexes into
+   line numbers and reversing the ranges, returning a nice new hunk *)
+let create_hunk prev_start prev_stop next_start next_stop ranges =
+  ({ prev_start = prev_start + 1
+   ; prev_size = prev_stop - prev_start
+   ; next_start = next_start + 1
+   ; next_size = next_stop - next_start
+   ; ranges = List.rev ranges
+   }
+   : _ Hunk.t)
+;;
 
 module Ordered_sequence : sig
   type elt = int * int [@@deriving compare]
@@ -195,169 +211,6 @@ let _longest_increasing_subsequence ar =
     let rec loop ac p = if p = -1 then ac else loop (ar.(p) :: ac) pred.(p) in
     loop [] m.(!maxlen))
 ;;
-
-module Matching_block = struct
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { prev_start : int
-        ; next_start : int
-        ; length : int
-        }
-      [@@deriving sexp, bin_io]
-    end
-  end
-
-  include Stable.V1
-end
-
-module Range = struct
-  module Stable = struct
-    module V1 = struct
-      type 'a t =
-        | Same of ('a * 'a) array
-        | Prev of 'a array
-        | Next of 'a array
-        | Replace of 'a array * 'a array
-        | Unified of 'a array
-      [@@deriving sexp, bin_io]
-    end
-  end
-
-  include Stable.V1
-
-  let all_same ranges =
-    List.for_all ranges ~f:(fun range ->
-      match range with
-      | Same _ -> true
-      | _ -> false)
-  ;;
-
-  let prev_only ranges =
-    let f = function
-      | Replace (l_range, _) -> [ Prev l_range ]
-      | Next _ -> []
-      | range -> [ range ]
-    in
-    List.concat_map ranges ~f
-  ;;
-
-  let next_only ranges =
-    let f = function
-      | Replace (_, r_range) -> [ Next r_range ]
-      | Prev _ -> []
-      | range -> [ range ]
-    in
-    List.concat_map ranges ~f
-  ;;
-
-  let prev_size = function
-    | Unified lines | Replace (lines, _) | Prev lines -> Array.length lines
-    | Same lines -> Array.length lines
-    | Next _ -> 0
-  ;;
-
-  let next_size = function
-    | Unified lines | Replace (_, lines) | Next lines -> Array.length lines
-    | Same lines -> Array.length lines
-    | Prev _ -> 0
-  ;;
-end
-
-module Hunk = struct
-  module Stable = struct
-    module V1 = struct
-      type 'a t =
-        { prev_start : int
-        ; prev_size : int
-        ; next_start : int
-        ; next_size : int
-        ; ranges : 'a Range.Stable.V1.t list
-        }
-      [@@deriving fields, sexp, bin_io]
-    end
-  end
-
-  include Stable.V1
-
-  let _invariant t =
-    Invariant.invariant [%here] t [%sexp_of: _ t] (fun () ->
-      [%test_result: int]
-        (List.sum (module Int) t.ranges ~f:Range.prev_size)
-        ~expect:t.prev_size
-        ~message:"prev_size";
-      [%test_result: int]
-        (List.sum (module Int) t.ranges ~f:Range.next_size)
-        ~expect:t.next_size
-        ~message:"next_size")
-  ;;
-
-  (* Does the nitty gritty of turning indexes into
-     line numbers and reversing the ranges, returning a nice new hunk *)
-  let create prev_start prev_stop next_start next_stop ranges =
-    { prev_start = prev_start + 1
-    ; prev_size = prev_stop - prev_start
-    ; next_start = next_start + 1
-    ; next_size = next_stop - next_start
-    ; ranges = List.rev ranges
-    }
-  ;;
-
-  let all_same hunk = Range.all_same hunk.ranges
-  let concat_map t ~f = { t with ranges = List.concat_map t.ranges ~f }
-end
-
-module Hunks = struct
-  module Stable = struct
-    module V1 = struct
-      type 'a t = 'a Hunk.Stable.V1.t list [@@deriving sexp, bin_io]
-    end
-  end
-
-  include Stable.V1
-
-  let concat_map_ranges hunks ~f = List.map hunks ~f:(Hunk.concat_map ~f)
-
-  let unified hunks =
-    let f : 'a Range.t -> 'a Range.t list = function
-      | Replace (l_range, r_range) -> [ Prev l_range; Next r_range ]
-      | range -> [ range ]
-    in
-    concat_map_ranges hunks ~f
-  ;;
-
-  let ranges hunks = List.concat_map hunks ~f:(fun hunk -> hunk.Hunk.ranges)
-end
-
-module type S = sig
-  type elt
-
-  val get_matching_blocks
-    :  transform:('a -> elt)
-    -> ?big_enough:int
-    -> prev:'a array
-    -> next:'a array
-    -> Matching_block.t list
-
-  val matches : elt array -> elt array -> (int * int) list
-  val match_ratio : elt array -> elt array -> float
-
-  val get_hunks
-    :  transform:('a -> elt)
-    -> context:int
-    -> ?big_enough:int
-    -> prev:'a array
-    -> next:'a array
-    -> 'a Hunk.t list
-
-  type 'a segment =
-    | Same of 'a array
-    | Different of 'a array array
-
-  type 'a merged_array = 'a segment list
-
-  val merge : elt array array -> elt merged_array
-end
 
 (* Configurable parameters for [semantic_cleanup] and [unique_lcs], all chosen based
    on empirical observation. *)
@@ -743,7 +596,7 @@ module Make (Elt : Hashtbl.Key) = struct
       |> fun (ans, pending) -> List.rev (pending :: ans)
   ;;
 
-  let get_matching_blocks ~transform ?(big_enough = 1) ~prev ~next =
+  let get_matching_blocks ~transform ?(big_enough = 1) ~prev ~next () =
     let prev = Array.map prev ~f:transform in
     let next = Array.map next ~f:transform in
     let matches = matches prev next |> collapse_sequences in
@@ -802,18 +655,18 @@ module Make (Elt : Hashtbl.Key) = struct
           aux remaining_blocks prev_stop next_stop l)
       | [] -> List.rev l
     in
-    let matching_blocks = get_matching_blocks ~transform ~big_enough ~prev ~next in
+    let matching_blocks = get_matching_blocks ~transform ~big_enough ~prev ~next () in
     aux matching_blocks 0 0 []
   ;;
 
-  let get_hunks ~transform ~context ?(big_enough = 1) ~prev ~next =
+  let get_hunks ~transform ~context ?(big_enough = 1) ~prev ~next () =
     let ranges = get_ranges_rev ~transform ~big_enough ~prev ~next in
     let a = prev in
     let b = next in
     if context < 0
     then (
       let singleton_hunk =
-        Hunk.create 0 (Array.length a) 0 (Array.length b) (List.rev ranges)
+        create_hunk 0 (Array.length a) 0 (Array.length b) (List.rev ranges)
       in
       [ singleton_hunk ])
     else (
@@ -821,7 +674,7 @@ module Make (Elt : Hashtbl.Key) = struct
         match (ranges_remaining : _ Range.t list) with
         | [] ->
           (* Finish the last hunk *)
-          let new_hunk = Hunk.create alo ahi blo bhi curr_ranges in
+          let new_hunk = create_hunk alo ahi blo bhi curr_ranges in
           (* Add it to the accumulator *)
           let acc_hunks = new_hunk :: acc_hunks in
           (* Finished! Return the accumulator *)
@@ -834,7 +687,7 @@ module Make (Elt : Hashtbl.Key) = struct
           (* Finish the current hunk *)
           let ahi = ahi + stop in
           let bhi = bhi + stop in
-          let new_hunk = Hunk.create alo ahi blo bhi curr_ranges in
+          let new_hunk = create_hunk alo ahi blo bhi curr_ranges in
           (* Add it to the accumulator *)
           let acc_hunks = new_hunk :: acc_hunks in
           (* Finished! Return the accumulator *)
@@ -850,7 +703,7 @@ module Make (Elt : Hashtbl.Key) = struct
             let ahi = ahi + context in
             let bhi = bhi + context in
             (* Finish the current hunk *)
-            let new_hunk = Hunk.create alo ahi blo bhi curr_ranges in
+            let new_hunk = create_hunk alo ahi blo bhi curr_ranges in
             (* Add it to the accumulator *)
             let acc_hunks = new_hunk :: acc_hunks in
             (* Calculate ranges for the next hunk *)
