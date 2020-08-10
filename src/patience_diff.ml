@@ -9,14 +9,13 @@ let ( <|> ) ar (i, j) = if j <= i then [||] else Array.slice ar i j
 
 (* Does the nitty gritty of turning indexes into
    line numbers and reversing the ranges, returning a nice new hunk *)
-let create_hunk prev_start prev_stop next_start next_stop ranges =
-  ({ prev_start = prev_start + 1
-   ; prev_size = prev_stop - prev_start
-   ; next_start = next_start + 1
-   ; next_size = next_stop - next_start
-   ; ranges = List.rev ranges
-   }
-   : _ Hunk.t)
+let create_hunk prev_start prev_stop next_start next_stop ranges : _ Hunk.t =
+  { prev_start = prev_start + 1
+  ; prev_size = prev_stop - prev_start
+  ; next_start = next_start + 1
+  ; next_size = next_stop - next_start
+  ; ranges = List.rev ranges
+  }
 ;;
 
 module Ordered_sequence : sig
@@ -107,9 +106,10 @@ end = struct
   module Play_patience : sig
     val play_patience
       :  Ordered_sequence.t
-      -> get_tag:(pile_opt:int option
-                  -> piles:Ordered_sequence.elt Backpointers.t Piles.t
-                  -> Ordered_sequence.elt Backpointers.tag option)
+      -> get_tag:
+           (pile_opt:int option
+            -> piles:Ordered_sequence.elt Backpointers.t Piles.t
+            -> Ordered_sequence.elt Backpointers.tag option)
       -> Ordered_sequence.elt Backpointers.t Piles.t
   end = struct
     let optimized_findi_from_left piles x =
@@ -277,10 +277,7 @@ module Make (Elt : Hashtbl.Key) = struct
         | Not_unique { occurrences_in_a = n } ->
           if n > 0
           then (
-            Hashtbl.set
-              unique
-              ~key:x
-              ~data:(Not_unique { occurrences_in_a = n - 1 });
+            Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = n - 1 });
             incr intersection_size)
         | Unique_in_a { index_in_a = x's_pos_in_a } ->
           incr num_pairs;
@@ -289,8 +286,7 @@ module Make (Elt : Hashtbl.Key) = struct
             unique
             ~key:x
             ~data:
-              (Unique_in_a_b
-                 { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
+              (Unique_in_a_b { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
         | Unique_in_a_b _ ->
           decr num_pairs;
           Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }))
@@ -380,8 +376,7 @@ module Make (Elt : Hashtbl.Key) = struct
               last_a_pos := apos;
               last_b_pos := bpos;
               add_match (apos, bpos));
-            if !matches_ref_length > old_length
-            (* Did unique_lcs find anything at all? *)
+            if !matches_ref_length > old_length (* Did unique_lcs find anything at all? *)
             then recurse_matches (!last_a_pos + 1) (!last_b_pos + 1) ahi bhi
             else plain_diff ())
     in
