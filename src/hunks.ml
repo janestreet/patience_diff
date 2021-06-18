@@ -1,5 +1,5 @@
 module Stable = struct
-  open! Core_kernel.Core_kernel_stable
+  open! Core.Core_stable
   module Hunk = Hunk.Stable
 
   module V1 = struct
@@ -7,7 +7,7 @@ module Stable = struct
   end
 end
 
-open! Core_kernel
+open! Core
 include Stable.V1
 
 let concat_map_ranges hunks ~f = List.map hunks ~f:(Hunk.concat_map ~f)

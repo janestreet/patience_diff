@@ -1,5 +1,5 @@
 module Stable = struct
-  open! Core_kernel.Core_kernel_stable
+  open! Core.Core_stable
   module Range = Range.Stable
 
   module V1 = struct
@@ -14,7 +14,7 @@ module Stable = struct
   end
 end
 
-open! Core_kernel
+open! Core
 include Stable.V1
 
 let _invariant t =

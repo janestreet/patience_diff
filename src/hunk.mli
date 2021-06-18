@@ -6,7 +6,7 @@
     Furthermore, a diff is essentially a list of hunks.  The simplest case is a diff with
     infinite context, consisting of exactly one hunk. *)
 
-open! Core_kernel
+open! Core
 
 type 'a t =
   { prev_start : int

@@ -39,7 +39,7 @@
     [(0, 0, 2), (3, 2, 2), (5, 4, 0)]
 *)
 
-open! Core_kernel
+open! Core
 module Hunk = Hunk
 module Hunks = Hunks
 module Matching_block = Matching_block

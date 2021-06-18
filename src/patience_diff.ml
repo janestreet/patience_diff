@@ -1,4 +1,4 @@
-open! Core_kernel
+open! Core
 include Patience_diff_intf
 module Hunk = Hunk
 module Hunks = Hunks
