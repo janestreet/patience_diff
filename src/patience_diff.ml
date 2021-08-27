@@ -293,9 +293,8 @@ module Make (Elt : Hashtbl.Key) = struct
     done;
     (* If we're ignoring almost all of the text when we perform the patience
        diff algorithm, it will often give bad results. *)
-    if
-      !num_pairs * switch_to_plain_diff_denominator
-      < !intersection_size * switch_to_plain_diff_numerator
+    if !num_pairs * switch_to_plain_diff_denominator
+       < !intersection_size * switch_to_plain_diff_numerator
     then `Not_enough_unique_tokens
     else (
       let a_b =
@@ -462,12 +461,11 @@ module Make (Elt : Hashtbl.Key) = struct
                 match ans with
                 | [] -> ans, pending
                 | hd :: tl ->
-                  if
-                    should_discard_match
-                      ~big_enough
-                      ~left_change:(change_between hd pending)
-                      ~right_change:(change_between pending current_block)
-                      ~block_len:pending.length
+                  if should_discard_match
+                       ~big_enough
+                       ~left_change:(change_between hd pending)
+                       ~right_change:(change_between pending current_block)
+                       ~block_len:pending.length
                   then loop tl hd
                   else ans, pending
               in
@@ -499,16 +497,15 @@ module Make (Elt : Hashtbl.Key) = struct
                 match ans with
                 | [] -> ans, pendingA, pendingB
                 | hd :: tl ->
-                  if
-                    should_discard_match
-                      ~big_enough
-                      ~left_change:(change_between hd pendingA)
-                      ~right_change:(change_between pendingB current_block)
-                      ~block_len:
-                        (pendingB.length
-                         + min
-                             (pendingB.prev_start - pendingA.prev_start)
-                             (pendingB.next_start - pendingA.next_start))
+                  if should_discard_match
+                       ~big_enough
+                       ~left_change:(change_between hd pendingA)
+                       ~right_change:(change_between pendingB current_block)
+                       ~block_len:
+                         (pendingB.length
+                          + min
+                              (pendingB.prev_start - pendingA.prev_start)
+                              (pendingB.next_start - pendingA.next_start))
                   then loop tl hd pendingA
                   else ans, pendingA, pendingB
               in
@@ -775,10 +772,9 @@ module Make (Elt : Hashtbl.Key) = struct
       let start = Array.create ~len:(List.length (List.hd_exn matches)) None in
       let length = ref 0 in
       List.iter matches ~f:(fun il ->
-        if
-          Array.for_all start ~f:Option.is_some
-          && List.mapi il ~f:(fun i x -> x = value_exn start.(i) + !length)
-             |> List.for_all ~f:(fun x -> x)
+        if Array.for_all start ~f:Option.is_some
+        && List.mapi il ~f:(fun i x -> x = value_exn start.(i) + !length)
+           |> List.for_all ~f:(fun x -> x)
         then incr length
         else (
           if Array.for_all start ~f:Option.is_some
@@ -879,9 +875,8 @@ let%test_module _ =
     let%test_unit _ =
       let check a b =
         let matches = P.matches a b in
-        if
-          is_increasing (-1) (List.map matches ~f:fst)
-          && is_increasing (-1) (List.map matches ~f:snd)
+        if is_increasing (-1) (List.map matches ~f:fst)
+        && is_increasing (-1) (List.map matches ~f:snd)
         then ()
         else
           failwiths
