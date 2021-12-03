@@ -12,9 +12,9 @@ build: [
 depends: [
   "ocaml" {>= "4.08.0"}
   "base"
-  "core_kernel"
+  "core"
   "ppx_jane"
-  "dune"        {>= "2.0.0"}
+  "dune"     {>= "2.0.0"}
 ]
 synopsis: "Diff library using Bram Cohen's patience diff algorithm"
 description: "
