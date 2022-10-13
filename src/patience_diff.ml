@@ -591,9 +591,188 @@ module Make (Elt : Hashtbl.Key) = struct
       |> fun (ans, pending) -> List.rev (pending :: ans)
   ;;
 
-  let get_matching_blocks ~transform ?(big_enough = 1) ~prev ~next () =
-    let prev = Array.map prev ~f:transform in
-    let next = Array.map next ~f:transform in
+  (* The aim here is to be able to transform e.g. foo f<insert>rob f</insert>lip into foo
+     <insert>frob </insert>flip by scoring each boundary. *)
+  (* {prev,next}_{elts,scorable} are the two arrays being diffed as (a) [Elt.t array]s
+     which comes from mapping with the [transform] function and (b) ['a array]s where the
+     [score] function operates on values of type ['a].
+
+     [blocks] is a list of [Matching_block.t]s which specify the contiguous chunks
+     of prev/next which are the same (when index ranges are missing, that missing
+     chunk is unique to the array they are missing from). *)
+  let align_diffs
+        ~prev_elts
+        ~prev_scorable
+        ~next_elts
+        ~next_scorable
+        ~max_slide
+        ~score
+        blocks
+    =
+    if max_slide = 0
+    then blocks
+    else (
+      match blocks with
+      | [] -> []
+      | (first_block : Matching_block.t) :: tl ->
+        let score_elt_and_prev arr kind i =
+          let i0 = i - 1 in
+          let i1 = i in
+          if i0 < 0 || i1 >= Array.length arr then 100 else score kind arr.(i0) arr.(i1)
+        in
+        (* [left] and [right] are both exclusive indexes, on either side of the inserted
+           or deleted region. *)
+        let score' arr ~left ~right =
+          score_elt_and_prev arr `right right + score_elt_and_prev arr `left (left + 1)
+        in
+        let score ~prev_left ~prev_right ~next_left ~next_right =
+          match prev_left + 1 = prev_right, next_left + 1 = next_right with
+          | true, true ->
+            (* This shouldn't happen; it means the two blocks of equal elements touch and
+               should have been merged. *)
+            0
+          | true, false ->
+            (* inserting *)
+            score' next_scorable ~left:next_left ~right:next_right
+          | false, true ->
+            (* deleting *)
+            score' prev_scorable ~left:prev_left ~right:prev_right
+          | false, false ->
+            (* editing. I think this also shouldn’t happen as if e.g. sliding right is
+               viable you could just have had a bigger matching block on the right instead
+            *)
+            min
+              (score' prev_scorable ~left:prev_left ~right:prev_right)
+              (score' next_scorable ~left:next_left ~right:next_right)
+        in
+        let rec align_consecutive_blocks acc (left_block : Matching_block.t) right_blocks =
+          let best_score = ref 0 in
+          let offset_of_best_score = ref 0 in
+          let score_initial
+                (left_block : Matching_block.t)
+                (right_block : Matching_block.t)
+            =
+            best_score
+            := score
+                 ~prev_left:(left_block.prev_start + left_block.length - 1)
+                 ~prev_right:right_block.prev_start
+                 ~next_left:(left_block.next_start + left_block.length - 1)
+                 ~next_right:right_block.next_start
+          in
+          let rec try_to_slide_left
+                    ~i
+                    (left_block : Matching_block.t)
+                    (right_block : Matching_block.t)
+            =
+            let offset_into_left = left_block.length - i in
+            if offset_into_left < 0
+            then ()
+            else if i > max_slide
+            then
+              ()
+              (* {v
+                next: A B C D X P Q R S T X E F G H I
+                prev: A B C D X             E F G H I
+                     ^         ^           ^         ^
+                     \..left../            \..right../ v}
+
+                 We want to see if shortening [left] and lengthening and moving-left
+                 [right] is viable. Requires last element of [left] to be equal to the
+                 element before [right]. *)
+            else (
+              let prev_left = left_block.prev_start + offset_into_left - 1 in
+              let prev_right = right_block.prev_start - i in
+              let next_left = left_block.next_start + offset_into_left - 1 in
+              let next_right = right_block.next_start - i in
+              if Elt.compare next_elts.(next_left + 1) next_elts.(next_right) <> 0
+              then ()
+              else if Elt.compare prev_elts.(prev_left + 1) prev_elts.(prev_right) <> 0
+              then ()
+              else (
+                let score = score ~prev_left ~prev_right ~next_left ~next_right in
+                if score > !best_score
+                then (
+                  best_score := score;
+                  offset_of_best_score := -i);
+                try_to_slide_left ~i:(i + 1) left_block right_block))
+          in
+          let rec try_to_slide_right
+                    ~i
+                    (left_block : Matching_block.t)
+                    (right_block : Matching_block.t)
+            =
+            let offset_into_left = left_block.length + i - 1 in
+            if i > right_block.length
+            then ()
+            else if i > max_slide
+            then
+              ()
+              (* {v
+                next: A B C D X P Q R S T X E F G H I
+                prev: A B C D             X E F G H I
+                     ^       ^           ^           ^
+                     \.left./            \...right.../ v}
+
+                 We want to see if lengthening [left] and shortening and moving-right
+                 [right] is viable. Requires element after [left] to be equal to the first
+                 element of [right]. *)
+            else (
+              let prev_left = left_block.prev_start + offset_into_left in
+              let prev_right = right_block.prev_start + i in
+              let next_left = left_block.next_start + offset_into_left in
+              let next_right = right_block.next_start + i in
+              if Elt.compare next_elts.(next_left) next_elts.(next_right - 1) <> 0
+              then ()
+              else if Elt.compare prev_elts.(prev_left) prev_elts.(prev_right - 1) <> 0
+              then ()
+              else (
+                let score = score ~prev_left ~prev_right ~next_left ~next_right in
+                if score > !best_score
+                then (
+                  best_score := score;
+                  offset_of_best_score := i);
+                try_to_slide_right ~i:(i + 1) left_block right_block))
+          in
+          match right_blocks with
+          | [] -> List.rev (left_block :: acc)
+          | right_block :: rest ->
+            (match left_block.length with
+             | 0 ->
+               (* It is possible to end up with a length=0 block due to sliding the
+                  previous block to include it. If this happens we should drop it (so long
+                  as it isn’t the last block; we want a length=0 block at the end). *)
+               align_consecutive_blocks acc right_block rest
+             | _ ->
+               score_initial left_block right_block;
+               try_to_slide_left ~i:1 left_block right_block;
+               try_to_slide_right ~i:1 left_block right_block;
+               (match !offset_of_best_score with
+                | 0 -> align_consecutive_blocks (left_block :: acc) right_block rest
+                | slide ->
+                  let new_left = { left_block with length = left_block.length + slide } in
+                  let new_right : Matching_block.t =
+                    { prev_start = right_block.prev_start + slide
+                    ; next_start = right_block.next_start + slide
+                    ; length = right_block.length - slide
+                    }
+                  in
+                  let acc = if new_left.length > 0 then new_left :: acc else acc in
+                  align_consecutive_blocks acc new_right rest))
+        in
+        align_consecutive_blocks [] first_block tl)
+  ;;
+
+  let get_matching_blocks
+        ~transform
+        ?(big_enough = 1)
+        ?(max_slide = 0)
+        ?(score = fun _ _ _ -> 100)
+        ~prev:prev_scorable
+        ~next:next_scorable
+        ()
+    =
+    let prev = Array.map prev_scorable ~f:transform in
+    let next = Array.map next_scorable ~f:transform in
     let matches = matches prev next |> collapse_sequences in
     let matches = combine_equalities ~prev ~next ~matches in
     let last_match =
@@ -602,10 +781,19 @@ module Make (Elt : Hashtbl.Key) = struct
       ; length = 0
       }
     in
-    List.append matches [ last_match ] |> semantic_cleanup ~big_enough
+    List.append matches [ last_match ]
+    |> semantic_cleanup ~big_enough
+    (* We want to score untransformed elements (e.g. still with whitespace) *)
+    |> align_diffs
+         ~prev_elts:prev
+         ~prev_scorable
+         ~next_elts:next
+         ~next_scorable
+         ~max_slide
+         ~score
   ;;
 
-  let get_ranges_rev ~transform ~big_enough ~prev ~next =
+  let get_ranges_rev ~transform ~big_enough ?max_slide ?score ~prev ~next () =
     let rec aux (matching_blocks : Matching_block.t list) i j l : _ Range.t list =
       match matching_blocks with
       | current_block :: remaining_blocks ->
@@ -650,12 +838,14 @@ module Make (Elt : Hashtbl.Key) = struct
           aux remaining_blocks prev_stop next_stop l)
       | [] -> List.rev l
     in
-    let matching_blocks = get_matching_blocks ~transform ~big_enough ~prev ~next () in
+    let matching_blocks =
+      get_matching_blocks ~transform ~big_enough ?max_slide ?score ~prev ~next ()
+    in
     aux matching_blocks 0 0 []
   ;;
 
-  let get_hunks ~transform ~context ?(big_enough = 1) ~prev ~next () =
-    let ranges = get_ranges_rev ~transform ~big_enough ~prev ~next in
+  let get_hunks ~transform ~context ?(big_enough = 1) ?max_slide ?score ~prev ~next () =
+    let ranges = get_ranges_rev ~transform ~big_enough ?max_slide ?score ~prev ~next () in
     let a = prev in
     let b = next in
     if context < 0

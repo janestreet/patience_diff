@@ -55,6 +55,8 @@ module type S = sig
   val get_matching_blocks
     :  transform:('a -> elt)
     -> ?big_enough:int
+    -> ?max_slide:int
+    -> ?score:([ `left | `right ] -> 'a -> 'a -> int)
     -> prev:'a array
     -> next:'a array
     -> unit
@@ -87,11 +89,21 @@ module type S = sig
       less than [big_enough].  Thus, setting [big_enough] to a higher value results in
       more aggressive cleanup, and the default value of 1 results in no cleanup at all.
       When this function is called by [Patdiff_core], the value of [big_enough] is 3 at
-      the line level, and 7 at the word level. *)
+      the line level, and 7 at the word level.
+
+      The value of [max_slide] controls how far we are willing to shift a diff (which is
+      immediately preceded/followed by the same lines as it ends/starts with). We choose
+      between equivalent positions by maximising the sum of the [score] function applied
+      to the two boundaries of the diff. By default, [max_slide] is 0. The arguments
+      passed to [score] are firstly whether the boundary is at the start or end of the
+      diff and then the values on either side of the boundary (if a boundary is considered
+      at the start or end of the input, it gets a score of 100). *)
   val get_hunks
     :  transform:('a -> elt)
     -> context:int
     -> ?big_enough:int
+    -> ?max_slide:int
+    -> ?score:([ `left | `right ] -> 'a -> 'a -> int)
     -> prev:'a array
     -> next:'a array
     -> unit
