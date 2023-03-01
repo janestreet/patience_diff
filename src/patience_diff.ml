@@ -30,11 +30,13 @@ module Ordered_sequence : sig
 end = struct
   type elt = int * int [@@deriving sexp_of]
 
-  let compare_elt =
+  let compare_elt a b =
     Comparable.lexicographic
       [ (fun (_, y0) (_, y1) -> Int.compare y0 y1)
       ; (fun (x0, _) (x1, _) -> Int.compare x0 x1)
       ]
+      a
+      b
   ;;
 
   type t = elt array [@@deriving sexp_of]
