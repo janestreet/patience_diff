@@ -1,3 +1,9 @@
+## Release v0.16.0
+
+* Added `?max_slide` and `?score` arguments to `get_matching_blocks` and `get_hunks`.
+
+## Old pre-v0.15 changelogs (very likely stale and incomplete)
+
 ## 113.24.00
 
 - Switch to PPX.
