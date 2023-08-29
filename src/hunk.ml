@@ -10,7 +10,7 @@ module Stable = struct
       ; next_size : int
       ; ranges : 'a Range.V1.t list
       }
-    [@@deriving fields, sexp, bin_io]
+    [@@deriving fields ~getters, sexp, bin_io]
   end
 end
 

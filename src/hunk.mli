@@ -15,7 +15,7 @@ type 'a t =
   ; next_size : int
   ; ranges : 'a Range.t list
   }
-[@@deriving fields, sexp_of]
+[@@deriving fields ~getters, sexp_of]
 
 (** [all_same t] returns true if [t] contains only Same ranges. *)
 val all_same : 'a t -> bool
