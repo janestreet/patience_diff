@@ -20,7 +20,6 @@
     # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 *)
 
-
 (** Bram Cohen's comment from the original Python code (with syntax changed to OCaml):
 
     [get_matching_blocks a b] returns a list of triples describing matching
