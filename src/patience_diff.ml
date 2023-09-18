@@ -1026,6 +1026,15 @@ module Make (Elt : Hashtbl.Key) = struct
                :: !merged_array;
         merged_array := Same (ar.(0) <|> (ar'.(0), ar'.(0) + len)) :: !merged_array;
         Array.iteri last_pos ~f:(fun i _ -> last_pos.(i) <- ar'.(i) + len));
+      let trailing_lines =
+        Array.existsi last_pos ~f:(fun i last_pos -> Array.length ar.(i) > last_pos)
+      in
+      if trailing_lines
+      then
+        merged_array
+          := Different
+               (Array.mapi last_pos ~f:(fun i n -> ar.(i) <|> (n, Array.length ar.(i))))
+             :: !merged_array;
       List.rev !merged_array)
   ;;
 end
