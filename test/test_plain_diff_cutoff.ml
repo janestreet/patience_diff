@@ -17,7 +17,8 @@ let%expect_test "exercise cutoff code path" =
   do_diff ~cutoff:None;
   [%expect {|
     (42 (7 3))
-    (43 (8 4)) |}];
+    (43 (8 4))
+    |}];
   do_diff ~cutoff:(Some 3);
   (* worse diff, but correct *)
   [%expect {| (9 (11 0)) |}]

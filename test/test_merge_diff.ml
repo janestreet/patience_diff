@@ -22,21 +22,24 @@ let%expect_test "Identical documents" =
        a
        b
        c
-       d |}];
+       d
+    |}];
   merge_and_print [| doc; doc |];
   [%expect {|
     ---- Same -----
        a
        b
        c
-       d |}];
+       d
+    |}];
   merge_and_print [| doc; doc; doc |];
   [%expect {|
     ---- Same -----
        a
        b
        c
-       d |}]
+       d
+    |}]
 ;;
 
 let%expect_test "Empty documents" =
@@ -46,13 +49,15 @@ let%expect_test "Empty documents" =
     -- Different --
     (0)a
     (0)b
-    (0)c |}];
+    (0)c
+    |}];
   merge_and_print [| [||]; doc |];
   [%expect {|
     -- Different --
     (1)a
     (1)b
-    (1)c |}];
+    (1)c
+    |}];
   let doc = [| "a"; "b"; "c" |] in
   merge_and_print [| doc; [| "" |] |];
   [%expect {|
@@ -60,14 +65,16 @@ let%expect_test "Empty documents" =
     (0)a
     (0)b
     (0)c
-    (1) |}];
+    (1)
+    |}];
   merge_and_print [| [| "" |]; doc |];
   [%expect {|
     -- Different --
     (0)
     (1)a
     (1)b
-    (1)c |}]
+    (1)c
+    |}]
 ;;
 
 let%expect_test "Documents with trailing added lines" =
@@ -81,7 +88,8 @@ let%expect_test "Documents with trailing added lines" =
        b
     -- Different --
     (1)c
-    (1)d |}];
+    (1)d
+    |}];
   merge_and_print [| long; short |];
   [%expect
     {|
@@ -90,7 +98,8 @@ let%expect_test "Documents with trailing added lines" =
        b
     -- Different --
     (0)c
-    (0)d |}]
+    (0)d
+    |}]
 ;;
 
 let%expect_test "Documents with leading added lines" =
@@ -104,7 +113,8 @@ let%expect_test "Documents with leading added lines" =
     (1)b
     ---- Same -----
        c
-       d |}];
+       d
+    |}];
   merge_and_print [| long; short |];
   [%expect
     {|
@@ -113,7 +123,8 @@ let%expect_test "Documents with leading added lines" =
     (0)b
     ---- Same -----
        c
-       d |}]
+       d
+    |}]
 ;;
 
 let%expect_test "Mixed documents with changes" =
@@ -132,5 +143,6 @@ let%expect_test "Mixed documents with changes" =
     -- Different --
     (1)bar
     ---- Same -----
-       d |}]
+       d
+    |}]
 ;;

@@ -43,6 +43,7 @@ module Hunk = Hunk
 module Hunks = Hunks
 module Matching_block = Matching_block
 module Range = Range
+module Move_id = Move_id
 
 module type S = sig
   type elt
@@ -68,7 +69,7 @@ module type S = sig
       all the pairs (prev_start * next_start). *)
   val matches : elt array -> elt array -> (int * int) list
 
-  (** [match_ratio ~compare a b] computes the ratio defined as:
+  (** [match_ratio a b] computes the ratio defined as:
 
       {[
         2 * len (matches a b) / (len a + len b)
@@ -122,6 +123,7 @@ module type Patience_diff = sig
   module Hunks = Hunks
   module Matching_block = Matching_block
   module Range = Range
+  module Move_id = Move_id
   module Make (Elt : Hashtbl.Key) : S with type elt = Elt.t
 
   (* [String] uses String.compare *)

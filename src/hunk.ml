@@ -2,6 +2,17 @@ module Stable = struct
   open! Core.Core_stable
   module Range = Range.Stable
 
+  module V2 = struct
+    type 'a t =
+      { prev_start : int
+      ; prev_size : int
+      ; next_start : int
+      ; next_size : int
+      ; ranges : 'a Range.V2.t list
+      }
+    [@@deriving fields ~getters, sexp, bin_io]
+  end
+
   module V1 = struct
     type 'a t =
       { prev_start : int
@@ -11,11 +22,29 @@ module Stable = struct
       ; ranges : 'a Range.V1.t list
       }
     [@@deriving fields ~getters, sexp, bin_io]
+
+    let to_v2 t =
+      { V2.prev_start = t.prev_start
+      ; prev_size = t.prev_size
+      ; next_start = t.next_start
+      ; next_size = t.next_size
+      ; ranges = Core.List.map t.ranges ~f:Range.V1.to_v2
+      }
+    ;;
+
+    let of_v2_no_moves_exn (t : _ V2.t) =
+      { prev_start = t.prev_start
+      ; prev_size = t.prev_size
+      ; next_start = t.next_start
+      ; next_size = t.next_size
+      ; ranges = Core.List.map t.ranges ~f:Range.V1.of_v2_no_moves_exn
+      }
+    ;;
   end
 end
 
 open! Core
-include Stable.V1
+include Stable.V2
 
 let _invariant t =
   Invariant.invariant [%here] t [%sexp_of: _ t] (fun () ->

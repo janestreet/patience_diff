@@ -4,6 +4,7 @@ module Hunk = Hunk
 module Hunks = Hunks
 module Matching_block = Matching_block
 module Range = Range
+module Move_id = Move_id
 
 let ( <|> ) ar (i, j) = if j <= i then [||] else Array.slice ar i j
 
@@ -811,15 +812,15 @@ module Make (Elt : Hashtbl.Key) = struct
             then (
               let prev_range = prev <|> (i, prev_index) in
               let next_range = next <|> (j, next_index) in
-              Some (Replace (prev_range, next_range)))
+              Some (Replace (prev_range, next_range, None)))
             else if i < prev_index
             then (
               let prev_range = prev <|> (i, prev_index) in
-              Some (Prev prev_range))
+              Some (Prev (prev_range, None)))
             else if j < next_index
             then (
               let next_range = next <|> (j, next_index) in
-              Some (Next next_range))
+              Some (Next (next_range, None)))
             else None
           in
           let l =
@@ -922,13 +923,16 @@ module Make (Elt : Hashtbl.Key) = struct
             | Unified _ ->
               (* get_ranges_rev never returns a Unified range *)
               assert false
-            | Next range ->
+            | Prev (_, Some _) | Next (_, Some _) | Replace (_, _, Some _) ->
+              (* get_ranges_rev never finds moves *)
+              assert false
+            | Next (range, None) ->
               let stop = bhi + Array.length range in
               ahi, stop
-            | Prev range ->
+            | Prev (range, None) ->
               let stop = ahi + Array.length range in
               stop, bhi
-            | Replace (a_range, b_range) ->
+            | Replace (a_range, b_range, None) ->
               let prev_stop = ahi + Array.length a_range in
               let next_stop = bhi + Array.length b_range in
               prev_stop, next_stop

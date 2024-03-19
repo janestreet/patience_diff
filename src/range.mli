@@ -4,16 +4,24 @@
     contains elements found only in the second array, while an [Prev] range contains
     elements found only in the first array.
 
+    If a range is part of a move it will have a non-None [Move_kind.t] or [Move_id.t] in
+    the case of [Replace] and [Unified]. A [Prev] with a [Move _] [Move_kind] means that
+    [Prev] has a corresponding [Next] that it was moved to. A [Prev] with a [Within_move _]
+    [Move_kind] means that this was some code that was deleted within a block that
+    moved to a [Next] position of the file. If a [Replace] or [Unified] range is
+    associated with a move it can only be change within a move so they only hove a
+    [Move_id.t option] instead of a [Move_kind.t option] like [Prev] or [Next].
+
     A [Replace] contains two arrays: elements in the first output array are elements found
     only in the first input array, which have been replaced by elements in the second
     output array, which are elements found only in the second input array. *)
 
 type 'a t =
   | Same of ('a * 'a) array
-  | Prev of 'a array
-  | Next of 'a array
-  | Replace of 'a array * 'a array
-  | Unified of 'a array
+  | Prev of 'a array * Move_kind.t option
+  | Next of 'a array * Move_kind.t option
+  | Replace of 'a array * 'a array * Move_id.t option
+  | Unified of 'a array * Move_id.t option
 [@@deriving sexp]
 
 (** [all_same ranges] returns true if all [ranges] are Same *)
@@ -33,7 +41,14 @@ val prev_size : 'a t -> int
 val next_size : 'a t -> int
 
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type nonrec 'a t = 'a t [@@deriving sexp, bin_io]
+  end
+
+  module V1 : sig
+    type nonrec 'a t [@@deriving sexp, bin_io]
+
+    val to_v2 : 'a t -> 'a V2.t
+    val of_v2_no_moves_exn : 'a V2.t -> 'a t
   end
 end
