@@ -1,3 +1,9 @@
+## Release v0.17.0
+
+- Can now find text that has been moved with the `find_moves` parameter
+- `Range` now can have a `Move_id` which identifies which move the current `Range` belongs to.
+  Multiple ranges can belong to the same move.
+
 ## Release v0.16.0
 
 * Added `?max_slide` and `?score` arguments to `get_matching_blocks` and `get_hunks`.
