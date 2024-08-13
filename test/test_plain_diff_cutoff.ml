@@ -15,7 +15,8 @@ let%expect_test "exercise cutoff code path" =
       ~hashable:(module Int)
   in
   do_diff ~cutoff:None;
-  [%expect {|
+  [%expect
+    {|
     (42 (7 3))
     (43 (8 4))
     |}];

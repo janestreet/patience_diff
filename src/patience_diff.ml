@@ -127,13 +127,16 @@ end = struct
       let%bind.Option last_pile = last_pile in
       if compare_top_values last_pile x_pile < 0
       then None
-      else
+      else (
         (* do binary search *)
-        Deque.binary_search
-          piles
-          `First_strictly_greater_than
-          x_pile
-          ~compare:compare_top_values
+        let r =
+          Deque.binary_search
+            piles
+            `First_strictly_greater_than
+            x_pile
+            ~compare:compare_top_values
+        in
+        [%globalize: int option] r [@nontail])
     ;;
 
     (* [play_patience ar ~get_tag] plays patience with the greedy algorithm as described
@@ -203,7 +206,7 @@ let _longest_increasing_subsequence ar =
           ar.(i)
           ~len:(max (!maxlen - 1) 0)
           ~pos:1
-        |> Option.value ~default:0
+        |> Option.value_local ~default:0
       in
       pred.(i) <- m.(p);
       if p = !maxlen || compare_int_pair ar.(i) ar.(p + 1) < 0
@@ -276,23 +279,22 @@ module Make (Elt : Hashtbl.Key) = struct
       let x = bravo.(x's_pos_in_b) in
       Hashtbl.find unique x
       |> Option.iter ~f:(fun pos ->
-           match pos with
-           | Not_unique { occurrences_in_a = n } ->
-             if n > 0
-             then (
-               Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = n - 1 });
-               incr intersection_size)
-           | Unique_in_a { index_in_a = x's_pos_in_a } ->
-             incr num_pairs;
-             incr intersection_size;
-             Hashtbl.set
-               unique
-               ~key:x
-               ~data:
-                 (Unique_in_a_b { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
-           | Unique_in_a_b _ ->
-             decr num_pairs;
-             Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }))
+        match pos with
+        | Not_unique { occurrences_in_a = n } ->
+          if n > 0
+          then (
+            Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = n - 1 });
+            incr intersection_size)
+        | Unique_in_a { index_in_a = x's_pos_in_a } ->
+          incr num_pairs;
+          incr intersection_size;
+          Hashtbl.set
+            unique
+            ~key:x
+            ~data:(Unique_in_a_b { index_in_a = x's_pos_in_a; index_in_b = x's_pos_in_b })
+        | Unique_in_a_b _ ->
+          decr num_pairs;
+          Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }))
     done;
     (* If we're ignoring almost all of the text when we perform the patience
        diff algorithm, it will often give bad results. *)
@@ -374,11 +376,11 @@ module Make (Elt : Hashtbl.Key) = struct
           | `Computed_lcs lcs ->
             lcs
             |> List.iter ~f:(fun (apos, bpos) ->
-                 if !last_a_pos + 1 <> apos || !last_b_pos + 1 <> bpos
-                 then recurse_matches (!last_a_pos + 1) (!last_b_pos + 1) apos bpos;
-                 last_a_pos := apos;
-                 last_b_pos := bpos;
-                 add_match (apos, bpos));
+              if !last_a_pos + 1 <> apos || !last_b_pos + 1 <> bpos
+              then recurse_matches (!last_a_pos + 1) (!last_b_pos + 1) apos bpos;
+              last_a_pos := apos;
+              last_b_pos := bpos;
+              add_match (apos, bpos));
             if !matches_ref_length > old_length (* Did unique_lcs find anything at all? *)
             then recurse_matches (!last_a_pos + 1) (!last_b_pos + 1) ahi bhi
             else plain_diff ())
@@ -460,20 +462,20 @@ module Make (Elt : Hashtbl.Key) = struct
             other_blocks
             ~init:([], first_block)
             ~f:(fun (ans, pending) current_block ->
-            let rec loop ans pending =
-              match ans with
-              | [] -> ans, pending
-              | hd :: tl ->
-                if should_discard_match
-                     ~big_enough
-                     ~left_change:(change_between hd pending)
-                     ~right_change:(change_between pending current_block)
-                     ~block_len:pending.length
-                then loop tl hd
-                else ans, pending
-            in
-            let updated_ans, updated_pending = loop ans pending in
-            updated_pending :: updated_ans, current_block)
+              let rec loop ans pending =
+                match ans with
+                | [] -> ans, pending
+                | hd :: tl ->
+                  if should_discard_match
+                       ~big_enough
+                       ~left_change:(change_between hd pending)
+                       ~right_change:(change_between pending current_block)
+                       ~block_len:pending.length
+                  then loop tl hd
+                  else ans, pending
+              in
+              let updated_ans, updated_pending = loop ans pending in
+              updated_pending :: updated_ans, current_block)
         in
         List.rev (final_pending :: final_ans))
   ;;
@@ -496,26 +498,26 @@ module Make (Elt : Hashtbl.Key) = struct
             other_blocks
             ~init:([], first_block, second_block)
             ~f:(fun (ans, pendingA, pendingB) current_block ->
-            let rec loop ans pendingA pendingB =
-              match ans with
-              | [] -> ans, pendingA, pendingB
-              | hd :: tl ->
-                if should_discard_match
-                     ~big_enough
-                     ~left_change:(change_between hd pendingA)
-                     ~right_change:(change_between pendingB current_block)
-                     ~block_len:
-                       (pendingB.length
-                        + min
-                            (pendingB.prev_start - pendingA.prev_start)
-                            (pendingB.next_start - pendingA.next_start))
-                then loop tl hd pendingA
-                else ans, pendingA, pendingB
-            in
-            let updated_ans, updated_pendingA, updated_pendingB =
-              loop ans pendingA pendingB
-            in
-            updated_pendingA :: updated_ans, updated_pendingB, current_block)
+              let rec loop ans pendingA pendingB =
+                match ans with
+                | [] -> ans, pendingA, pendingB
+                | hd :: tl ->
+                  if should_discard_match
+                       ~big_enough
+                       ~left_change:(change_between hd pendingA)
+                       ~right_change:(change_between pendingB current_block)
+                       ~block_len:
+                         (pendingB.length
+                          + min
+                              (pendingB.prev_start - pendingA.prev_start)
+                              (pendingB.next_start - pendingA.next_start))
+                  then loop tl hd pendingA
+                  else ans, pendingA, pendingB
+              in
+              let updated_ans, updated_pendingA, updated_pendingB =
+                loop ans pendingA pendingB
+              in
+              updated_pendingA :: updated_ans, updated_pendingB, current_block)
         in
         List.rev (final_pendingB :: final_pendingA :: final_ans)
         (* The loop above only deleted the second element of each pair we're supposed to
@@ -656,11 +658,11 @@ module Make (Elt : Hashtbl.Key) = struct
             (right_block : Matching_block.t)
             =
             best_score
-              := score
-                   ~prev_left:(left_block.prev_start + left_block.length - 1)
-                   ~prev_right:right_block.prev_start
-                   ~next_left:(left_block.next_start + left_block.length - 1)
-                   ~next_right:right_block.next_start
+            := score
+                 ~prev_left:(left_block.prev_start + left_block.length - 1)
+                 ~prev_right:right_block.prev_start
+                 ~next_left:(left_block.next_start + left_block.length - 1)
+                 ~next_right:right_block.next_start
           in
           let rec try_to_slide_left
             ~i
@@ -976,13 +978,13 @@ module Make (Elt : Hashtbl.Key) = struct
           if Array.for_all start ~f:Option.is_some
           then
             collapsed
-              := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
+            := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
           List.iteri il ~f:(fun i x -> start.(i) <- Some x);
           length := 1));
       if Array.for_all start ~f:Option.is_some && !length <> 0
       then
         collapsed
-          := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
+        := (Array.map start ~f:value_exn |> Array.to_list, !length) :: !collapsed;
       List.rev !collapsed)
   ;;
 
@@ -1013,9 +1015,9 @@ module Make (Elt : Hashtbl.Key) = struct
       let list =
         Hashtbl.to_alist hashtbl
         |> List.filter_map ~f:(fun (a, l) ->
-             if List.length l = len - 1
-             then Some (a :: (List.sort l ~compare:compare_int_pair |> List.map ~f:snd))
-             else None)
+          if List.length l = len - 1
+          then Some (a :: (List.sort l ~compare:compare_int_pair |> List.map ~f:snd))
+          else None)
         |> List.sort ~compare:(List.compare Int.compare)
       in
       let matching_blocks = collapse_multi_sequences list in
@@ -1026,8 +1028,8 @@ module Make (Elt : Hashtbl.Key) = struct
         if Array.compare Int.compare last_pos ar' <> 0
         then
           merged_array
-            := Different (array_mapi2 last_pos ar' ~f:(fun i n m -> ar.(i) <|> (n, m)))
-               :: !merged_array;
+          := Different (array_mapi2 last_pos ar' ~f:(fun i n m -> ar.(i) <|> (n, m)))
+             :: !merged_array;
         merged_array := Same (ar.(0) <|> (ar'.(0), ar'.(0) + len)) :: !merged_array;
         Array.iteri last_pos ~f:(fun i _ -> last_pos.(i) <- ar'.(i) + len));
       let trailing_lines =
@@ -1036,9 +1038,9 @@ module Make (Elt : Hashtbl.Key) = struct
       if trailing_lines
       then
         merged_array
-          := Different
-               (Array.mapi last_pos ~f:(fun i n -> ar.(i) <|> (n, Array.length ar.(i))))
-             :: !merged_array;
+        := Different
+             (Array.mapi last_pos ~f:(fun i n -> ar.(i) <|> (n, Array.length ar.(i))))
+           :: !merged_array;
       List.rev !merged_array)
   ;;
 end

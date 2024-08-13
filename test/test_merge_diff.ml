@@ -4,20 +4,20 @@ open Import
 let merge_and_print arrs =
   Patience_diff.String.merge arrs
   |> List.iter ~f:(function
-       | Same arr ->
-         print_endline "---- Same -----";
-         Array.iter arr ~f:(fun line -> print_endline ("   " ^ line))
-       | Different arrs ->
-         print_endline "-- Different --";
-         Array.iteri arrs ~f:(fun idx ->
-           Array.iter ~f:(fun line ->
-             print_endline ("(" ^ Int.to_string idx ^ ")" ^ line))))
+    | Same arr ->
+      print_endline "---- Same -----";
+      Array.iter arr ~f:(fun line -> print_endline ("   " ^ line))
+    | Different arrs ->
+      print_endline "-- Different --";
+      Array.iteri arrs ~f:(fun idx ->
+        Array.iter ~f:(fun line -> print_endline ("(" ^ Int.to_string idx ^ ")" ^ line))))
 ;;
 
 let%expect_test "Identical documents" =
   let doc = [| "a"; "b"; "c"; "d" |] in
   merge_and_print [| doc |];
-  [%expect {|
+  [%expect
+    {|
     ---- Same -----
        a
        b
@@ -25,7 +25,8 @@ let%expect_test "Identical documents" =
        d
     |}];
   merge_and_print [| doc; doc |];
-  [%expect {|
+  [%expect
+    {|
     ---- Same -----
        a
        b
@@ -33,7 +34,8 @@ let%expect_test "Identical documents" =
        d
     |}];
   merge_and_print [| doc; doc; doc |];
-  [%expect {|
+  [%expect
+    {|
     ---- Same -----
        a
        b
@@ -45,14 +47,16 @@ let%expect_test "Identical documents" =
 let%expect_test "Empty documents" =
   let doc = [| "a"; "b"; "c" |] in
   merge_and_print [| doc; [||] |];
-  [%expect {|
+  [%expect
+    {|
     -- Different --
     (0)a
     (0)b
     (0)c
     |}];
   merge_and_print [| [||]; doc |];
-  [%expect {|
+  [%expect
+    {|
     -- Different --
     (1)a
     (1)b
@@ -60,7 +64,8 @@ let%expect_test "Empty documents" =
     |}];
   let doc = [| "a"; "b"; "c" |] in
   merge_and_print [| doc; [| "" |] |];
-  [%expect {|
+  [%expect
+    {|
     -- Different --
     (0)a
     (0)b
@@ -68,7 +73,8 @@ let%expect_test "Empty documents" =
     (1)
     |}];
   merge_and_print [| [| "" |]; doc |];
-  [%expect {|
+  [%expect
+    {|
     -- Different --
     (0)
     (1)a

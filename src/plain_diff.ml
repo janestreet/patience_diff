@@ -26,7 +26,7 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *)
+*)
 (* $Id: diff.ml,v 1.2 2013-02-26 08:15:06 deraugla Exp $ *)
 (* Parts of Code of GNU diff (diffseq.h and analyze.c) translated to OCaml and adjusted.
 

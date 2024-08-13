@@ -1,7 +1,11 @@
+open! Core
+
 (** Each move identified in the code is given a unique move ID which can be used to
     distinguish it from other moves.
 *)
 type t [@@deriving sexp, compare]
+
+include Comparable.S_plain with type t := t
 
 val to_string : t -> string
 

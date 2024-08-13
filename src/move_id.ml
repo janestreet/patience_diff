@@ -8,6 +8,7 @@ end
 
 open! Core
 include Stable.V1
+include Comparable.Make_plain (Stable.V1)
 
 let zero = 0
 let succ = Int.succ
