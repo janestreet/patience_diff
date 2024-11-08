@@ -1045,57 +1045,55 @@ module Make (Elt : Hashtbl.Key) = struct
   ;;
 end
 
-let%test_module _ =
-  (module struct
-    module P = Make (Int)
+module%test _ = struct
+  module P = Make (Int)
 
-    let%test_unit _ =
-      let check a b ~expect = [%test_result: (int * int) list] (P.matches a b) ~expect in
-      check [||] [||] ~expect:[];
-      check [| 0 |] [| 0 |] ~expect:[ 0, 0 ];
-      check [| 0; 1; 1; 2 |] [| 3; 1; 4; 5 |] ~expect:[ 1, 1 ]
-    ;;
+  let%test_unit _ =
+    let check a b ~expect = [%test_result: (int * int) list] (P.matches a b) ~expect in
+    check [||] [||] ~expect:[];
+    check [| 0 |] [| 0 |] ~expect:[ 0, 0 ];
+    check [| 0; 1; 1; 2 |] [| 3; 1; 4; 5 |] ~expect:[ 1, 1 ]
+  ;;
 
-    (* Needs the plain diff section *)
+  (* Needs the plain diff section *)
 
-    let rec is_increasing a = function
-      | [] -> true
-      | hd :: tl -> Int.compare a hd <= 0 && is_increasing hd tl
-    ;;
+  let rec is_increasing a = function
+    | [] -> true
+    | hd :: tl -> Int.compare a hd <= 0 && is_increasing hd tl
+  ;;
 
-    let check_lis a =
-      let b = Patience.longest_increasing_subsequence (Ordered_sequence.create a) in
-      if is_increasing (-1) (List.map b ~f:fst) && is_increasing (-1) (List.map b ~f:snd)
+  let check_lis a =
+    let b = Patience.longest_increasing_subsequence (Ordered_sequence.create a) in
+    if is_increasing (-1) (List.map b ~f:fst) && is_increasing (-1) (List.map b ~f:snd)
+    then ()
+    else
+      failwiths
+        ~here:[%here]
+        "invariant failure"
+        (a, b)
+        [%sexp_of: (int * int) list * (int * int) list]
+  ;;
+
+  let%test_unit _ = check_lis [ 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
+  let%test_unit _ = check_lis [ 0, 0; 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
+  let%test_unit _ = check_lis [ 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
+
+  let%test_unit _ =
+    let check a b =
+      let matches = P.matches a b in
+      if is_increasing (-1) (List.map matches ~f:fst)
+         && is_increasing (-1) (List.map matches ~f:snd)
       then ()
       else
         failwiths
           ~here:[%here]
           "invariant failure"
-          (a, b)
-          [%sexp_of: (int * int) list * (int * int) list]
-    ;;
-
-    let%test_unit _ = check_lis [ 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
-    let%test_unit _ = check_lis [ 0, 0; 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
-    let%test_unit _ = check_lis [ 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
-
-    let%test_unit _ =
-      let check a b =
-        let matches = P.matches a b in
-        if is_increasing (-1) (List.map matches ~f:fst)
-           && is_increasing (-1) (List.map matches ~f:snd)
-        then ()
-        else
-          failwiths
-            ~here:[%here]
-            "invariant failure"
-            (a, b, matches)
-            [%sexp_of: int array * int array * (int * int) list]
-      in
-      check [| 0; 1; 2; 3; 4; 5; 6 |] [| 2; 5; 6; 3; 0; 4; 1 |]
-    ;;
-  end)
-;;
+          (a, b, matches)
+          [%sexp_of: int array * int array * (int * int) list]
+    in
+    check [| 0; 1; 2; 3; 4; 5; 6 |] [| 2; 5; 6; 3; 0; 4; 1 |]
+  ;;
+end
 
 module String = Make (String)
 
