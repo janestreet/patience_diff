@@ -10,10 +10,10 @@
 type t =
   | Move of Move_id.t
   | Within_move of Move_id.t
-[@@deriving sexp]
+[@@deriving sexp, compare]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io]
+    type nonrec t = t [@@deriving sexp, bin_io, compare]
   end
 end

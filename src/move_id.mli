@@ -17,6 +17,6 @@ val succ : t -> t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io]
+    type nonrec t = t [@@deriving sexp, bin_io, compare]
   end
 end
