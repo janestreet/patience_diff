@@ -1,15 +1,15 @@
-(** For handling diffs abstractly.  A range is a subarray of the two original arrays with
-    a constructor defining its relationship to the two original arrays.  A [Same] range
-    contains a series of elements which can be found in both arrays.  A [Next] range
+(** For handling diffs abstractly. A range is a subarray of the two original arrays with a
+    constructor defining its relationship to the two original arrays. A [Same] range
+    contains a series of elements which can be found in both arrays. A [Next] range
     contains elements found only in the second array, while an [Prev] range contains
     elements found only in the first array.
 
     If a range is part of a move it will have a non-None [Move_kind.t] or [Move_id.t] in
     the case of [Replace] and [Unified]. A [Prev] with a [Move _] [Move_kind] means that
-    [Prev] has a corresponding [Next] that it was moved to. A [Prev] with a [Within_move _]
-    [Move_kind] means that this was some code that was deleted within a block that
-    moved to a [Next] position of the file. If a [Replace] or [Unified] range is
-    associated with a move it can only be change within a move so they only hove a
+    [Prev] has a corresponding [Next] that it was moved to. A [Prev] with a
+    [Within_move _] [Move_kind] means that this was some code that was deleted within a
+    block that moved to a [Next] position of the file. If a [Replace] or [Unified] range
+    is associated with a move it can only be change within a move so they only hove a
     [Move_id.t option] instead of a [Move_kind.t option] like [Prev] or [Next].
 
     A [Replace] contains two arrays: elements in the first output array are elements found

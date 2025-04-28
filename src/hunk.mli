@@ -1,9 +1,9 @@
 (** In diff terms, a hunk is a unit of consecutive ranges with some [Same] context before
-    and after [Next], [Prev], and [Replace] ranges.  Each hunk contains information about
+    and after [Next], [Prev], and [Replace] ranges. Each hunk contains information about
     the original arrays, specifically the starting indexes and the number of elements in
     both arrays to which the hunk refers.
 
-    Furthermore, a diff is essentially a list of hunks.  The simplest case is a diff with
+    Furthermore, a diff is essentially a list of hunks. The simplest case is a diff with
     infinite context, consisting of exactly one hunk. *)
 
 open! Core

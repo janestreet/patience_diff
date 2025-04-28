@@ -188,7 +188,7 @@ end
 
 let compare_int_pair = Tuple.T2.compare ~cmp1:Int.compare ~cmp2:Int.compare
 
-let _longest_increasing_subsequence ar =
+let%template _longest_increasing_subsequence ar =
   let ar = (ar : Ordered_sequence.t :> (int * int) array) in
   let len = Array.length ar in
   if len <= 1
@@ -206,7 +206,7 @@ let _longest_increasing_subsequence ar =
           ar.(i)
           ~len:(max (!maxlen - 1) 0)
           ~pos:1
-        |> Option.value_local ~default:0
+        |> (Option.value [@mode local]) ~default:0
       in
       pred.(i) <- m.(p);
       if p = !maxlen || compare_int_pair ar.(i) ar.(p + 1) < 0
@@ -1067,11 +1067,7 @@ module%test _ = struct
     if is_increasing (-1) (List.map b ~f:fst) && is_increasing (-1) (List.map b ~f:snd)
     then ()
     else
-      failwiths
-        ~here:[%here]
-        "invariant failure"
-        (a, b)
-        [%sexp_of: (int * int) list * (int * int) list]
+      failwiths "invariant failure" (a, b) [%sexp_of: (int * int) list * (int * int) list]
   ;;
 
   let%test_unit _ = check_lis [ 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
@@ -1086,7 +1082,6 @@ module%test _ = struct
       then ()
       else
         failwiths
-          ~here:[%here]
           "invariant failure"
           (a, b, matches)
           [%sexp_of: int array * int array * (int * int) list]
