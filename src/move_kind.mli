@@ -8,10 +8,10 @@
 type t =
   | Move of Move_id.t
   | Within_move of Move_id.t
-[@@deriving sexp, compare]
+[@@deriving sexp, compare ~localize]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io, compare]
+    type nonrec t = t [@@deriving sexp, bin_io, compare ~localize]
   end
 end
