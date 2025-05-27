@@ -10,7 +10,7 @@ module Stable = struct
       ; next_size : int
       ; ranges : 'a Range.V2.t list
       }
-    [@@deriving fields ~getters, sexp, bin_io, compare]
+    [@@deriving fields ~getters, sexp, bin_io, compare ~localize]
   end
 
   module V1 = struct

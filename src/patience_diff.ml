@@ -20,30 +20,30 @@ let create_hunk prev_start prev_stop next_start next_stop ranges : _ Hunk.t =
 ;;
 
 module Ordered_sequence : sig
-  type elt = int * int [@@deriving compare]
+  type elt = int * int [@@deriving compare ~localize]
 
   (* A [t] has its second coordinates in increasing order *)
 
   type t = private elt array [@@deriving sexp_of]
 
-  val create : (int * int) list -> t
+  val create : (int * int) array -> t
   val is_empty : t -> bool
 end = struct
   type elt = int * int [@@deriving sexp_of]
 
-  let compare_elt a b =
-    Comparable.lexicographic
+  let%template compare_elt a b =
+    (Comparable.lexicographic [@mode m])
       [ (fun (_, y0) (_, y1) -> Int.compare y0 y1)
       ; (fun (x0, _) (x1, _) -> Int.compare x0 x1)
       ]
       a
       b
+  [@@mode m = (local, global)]
   ;;
 
   type t = elt array [@@deriving sexp_of]
 
-  let create l =
-    let t = Array.of_list l in
+  let create t =
     Array.sort t ~compare:compare_elt;
     t
   ;;
@@ -303,12 +303,14 @@ module Make (Elt : Hashtbl.Key) = struct
     then `Not_enough_unique_tokens
     else (
       let a_b =
-        let unique =
-          Hashtbl.filter_map unique ~f:(function
-            | Not_unique _ | Unique_in_a _ -> None
-            | Unique_in_a_b { index_in_a = i_a; index_in_b = i_b } -> Some (i_a, i_b))
-        in
-        Ordered_sequence.create (Hashtbl.data unique)
+        let arr = Array.init !num_pairs ~f:(fun _ -> 0, 0) in
+        let i = ref 0 in
+        Hashtbl.iter unique ~f:(function
+          | Not_unique _ | Unique_in_a _ -> ()
+          | Unique_in_a_b { index_in_a = i_a; index_in_b = i_b } ->
+            arr.(!i) <- i_a, i_b;
+            Int.incr i);
+        Ordered_sequence.create arr
       in
       `Computed_lcs (Patience.longest_increasing_subsequence a_b))
   ;;
@@ -1063,7 +1065,9 @@ module%test _ = struct
   ;;
 
   let check_lis a =
-    let b = Patience.longest_increasing_subsequence (Ordered_sequence.create a) in
+    let b =
+      Patience.longest_increasing_subsequence (Ordered_sequence.create (Array.of_list a))
+    in
     if is_increasing (-1) (List.map b ~f:fst) && is_increasing (-1) (List.map b ~f:snd)
     then ()
     else

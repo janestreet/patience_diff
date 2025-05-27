@@ -2,7 +2,7 @@ open! Core
 
 (** Each move identified in the code is given a unique move ID which can be used to
     distinguish it from other moves. *)
-type t [@@deriving sexp, compare]
+type t [@@deriving sexp, compare ~localize]
 
 include Comparable.S_plain with type t := t
 
@@ -16,6 +16,6 @@ val succ : t -> t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io, compare]
+    type nonrec t = t [@@deriving sexp, bin_io, compare ~localize]
   end
 end
