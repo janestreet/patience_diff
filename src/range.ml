@@ -8,7 +8,7 @@ module Stable = struct
       | Next of 'a array * Move_kind.Stable.V1.t option
       | Replace of 'a array * 'a array * Move_id.Stable.V1.t option
       | Unified of 'a array * Move_id.Stable.V1.t option
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp, bin_io, compare ~localize]
   end
 
   module V1 = struct

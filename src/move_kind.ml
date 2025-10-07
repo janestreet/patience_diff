@@ -5,7 +5,7 @@ module Stable = struct
     type t =
       | Move of Move_id.Stable.V1.t
       | Within_move of Move_id.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp, bin_io, compare ~localize]
   end
 end
 

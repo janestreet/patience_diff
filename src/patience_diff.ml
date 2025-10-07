@@ -20,30 +20,30 @@ let create_hunk prev_start prev_stop next_start next_stop ranges : _ Hunk.t =
 ;;
 
 module Ordered_sequence : sig
-  type elt = int * int [@@deriving compare]
+  type elt = int * int [@@deriving compare ~localize]
 
   (* A [t] has its second coordinates in increasing order *)
 
   type t = private elt array [@@deriving sexp_of]
 
-  val create : (int * int) list -> t
+  val create : (int * int) array -> t
   val is_empty : t -> bool
 end = struct
   type elt = int * int [@@deriving sexp_of]
 
-  let compare_elt a b =
-    Comparable.lexicographic
+  let%template compare_elt a b =
+    (Comparable.lexicographic [@mode m])
       [ (fun (_, y0) (_, y1) -> Int.compare y0 y1)
       ; (fun (x0, _) (x1, _) -> Int.compare x0 x1)
       ]
       a
       b
+  [@@mode m = (local, global)]
   ;;
 
   type t = elt array [@@deriving sexp_of]
 
-  let create l =
-    let t = Array.of_list l in
+  let create t =
     Array.sort t ~compare:compare_elt;
     t
   ;;
@@ -188,7 +188,7 @@ end
 
 let compare_int_pair = Tuple.T2.compare ~cmp1:Int.compare ~cmp2:Int.compare
 
-let _longest_increasing_subsequence ar =
+let%template _longest_increasing_subsequence ar =
   let ar = (ar : Ordered_sequence.t :> (int * int) array) in
   let len = Array.length ar in
   if len <= 1
@@ -206,7 +206,7 @@ let _longest_increasing_subsequence ar =
           ar.(i)
           ~len:(max (!maxlen - 1) 0)
           ~pos:1
-        |> Option.value_local ~default:0
+        |> (Option.value [@mode local]) ~default:0
       in
       pred.(i) <- m.(p);
       if p = !maxlen || compare_int_pair ar.(i) ar.(p + 1) < 0
@@ -303,12 +303,14 @@ module Make (Elt : Hashtbl.Key) = struct
     then `Not_enough_unique_tokens
     else (
       let a_b =
-        let unique =
-          Hashtbl.filter_map unique ~f:(function
-            | Not_unique _ | Unique_in_a _ -> None
-            | Unique_in_a_b { index_in_a = i_a; index_in_b = i_b } -> Some (i_a, i_b))
-        in
-        Ordered_sequence.create (Hashtbl.data unique)
+        let arr = Array.init !num_pairs ~f:(fun _ -> 0, 0) in
+        let i = ref 0 in
+        Hashtbl.iter unique ~f:(function
+          | Not_unique _ | Unique_in_a _ -> ()
+          | Unique_in_a_b { index_in_a = i_a; index_in_b = i_b } ->
+            arr.(!i) <- i_a, i_b;
+            Int.incr i);
+        Ordered_sequence.create arr
       in
       `Computed_lcs (Patience.longest_increasing_subsequence a_b))
   ;;
@@ -1063,15 +1065,13 @@ module%test _ = struct
   ;;
 
   let check_lis a =
-    let b = Patience.longest_increasing_subsequence (Ordered_sequence.create a) in
+    let b =
+      Patience.longest_increasing_subsequence (Ordered_sequence.create (Array.of_list a))
+    in
     if is_increasing (-1) (List.map b ~f:fst) && is_increasing (-1) (List.map b ~f:snd)
     then ()
     else
-      failwiths
-        ~here:[%here]
-        "invariant failure"
-        (a, b)
-        [%sexp_of: (int * int) list * (int * int) list]
+      failwiths "invariant failure" (a, b) [%sexp_of: (int * int) list * (int * int) list]
   ;;
 
   let%test_unit _ = check_lis [ 2, 0; 5, 1; 6, 2; 3, 3; 0, 4; 4, 5; 1, 6 ]
@@ -1086,7 +1086,6 @@ module%test _ = struct
       then ()
       else
         failwiths
-          ~here:[%here]
           "invariant failure"
           (a, b, matches)
           [%sexp_of: int array * int array * (int * int) list]

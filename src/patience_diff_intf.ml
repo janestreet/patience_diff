@@ -3,24 +3,19 @@
 
     This copyright notice was included:
 
-    # Copyright (C) 2005 Bram Cohen, Copyright (C) 2005, 2006 Canonical Ltd
-    #
-    # This program is free software; you can redistribute it and/or modify
-    # it under the terms of the GNU General Public License as published by
-    # the Free Software Foundation; either version 2 of the License, or
-    # (at your option) any later version.
-    #
-    # This program is distributed in the hope that it will be useful,
-    # but WITHOUT ANY WARRANTY; without even the implied warranty of
-    # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    # GNU General Public License for more details.
-    #
-    # You should have received a copy of the GNU General Public License
-    # along with this program; if not, write to the Free Software
-    # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-*)
+    # Copyright (C) 2005 Bram Cohen, Copyright (C) 2005, 2006 Canonical Ltd # # This
+    program is free software; you can redistribute it and/or modify # it under the terms
+    of the GNU General Public License as published by # the Free Software Foundation;
+    either version 2 of the License, or # (at your option) any later version. # # This
+    program is distributed in the hope that it will be useful, # but WITHOUT ANY WARRANTY;
+    without even the implied warranty of # MERCHANTABILITY or FITNESS FOR A PARTICULAR
+    PURPOSE. See the # GNU General Public License for more details. # # You should have
+    received a copy of the GNU General Public License # along with this program; if not,
+    write to the Free Software # Foundation, Inc., 51 Franklin Street, Fifth Floor,
+    Boston, MA 02110-1301 USA *)
 
-(** Bram Cohen's comment from the original Python code (with syntax changed to OCaml):
+(** {v
+ Bram Cohen's comment from the original Python code (with syntax changed to OCaml):
 
     [get_matching_blocks a b] returns a list of triples describing matching
     subsequences.
@@ -36,7 +31,7 @@
     get_matching_blocks [|"a";"b";"x";"c";"d"|] [|"a";"b";"c";"d"|]
     returns
     [(0, 0, 2), (3, 2, 2), (5, 4, 0)]
-*)
+    v} *)
 
 open! Core
 module Hunk = Hunk
@@ -50,8 +45,8 @@ module type S = sig
 
   (** Get_matching_blocks not only aggregates the data from [matches a b] but also
       attempts to remove random, semantically meaningless matches ("semantic cleanup").
-      The value of [big_enough] governs how aggressively we do so.  See [get_hunks]
-      below for more details. *)
+      The value of [big_enough] governs how aggressively we do so. See [get_hunks] below
+      for more details. *)
   val get_matching_blocks
     :  transform:('a -> elt)
     -> ?big_enough:int
@@ -63,7 +58,7 @@ module type S = sig
     -> Matching_block.t list
 
   (** [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that
-      the list is strictly increasing in both its first and second coordinates.  This is
+      the list is strictly increasing in both its first and second coordinates. This is
       essentially a "unfolded" version of what [get_matching_blocks] returns. Instead of
       grouping the consecutive matching block using [length] this function would return
       all the pairs (prev_start * next_start). *)
@@ -75,21 +70,21 @@ module type S = sig
         2 * len (matches a b) / (len a + len b)
       ]}
 
-      It is an indication of how much alike a and b are.  A ratio closer to 1.0 will
+      It is an indication of how much alike a and b are. A ratio closer to 1.0 will
       indicate a number of matches close to the number of elements that can potentially
-      match, thus is a sign that a and b are very much alike.  On the next hand, a low
+      match, thus is a sign that a and b are very much alike. On the next hand, a low
       ratio means very little match. *)
   val match_ratio : elt array -> elt array -> float
 
   (** [get_hunks ~transform ~context ~prev ~next] will compare the arrays [prev] and
       [next] and produce a list of hunks. (The hunks will contain Same ranges of at most
-      [context] elements.)  Negative [context] is equivalent to infinity (producing a
-      singleton hunk list).  The value of [big_enough] governs how aggressively we try to
+      [context] elements.) Negative [context] is equivalent to infinity (producing a
+      singleton hunk list). The value of [big_enough] governs how aggressively we try to
       clean up spurious matches, by restricting our attention to only matches of length
-      less than [big_enough].  Thus, setting [big_enough] to a higher value results in
-      more aggressive cleanup, and the default value of 1 results in no cleanup at all.
-      When this function is called by [Patdiff_core], the value of [big_enough] is 3 at
-      the line level, and 7 at the word level.
+      less than [big_enough]. Thus, setting [big_enough] to a higher value results in more
+      aggressive cleanup, and the default value of 1 results in no cleanup at all. When
+      this function is called by [Patdiff_core], the value of [big_enough] is 3 at the
+      line level, and 7 at the word level.
 
       The value of [max_slide] controls how far we are willing to shift a diff (which is
       immediately preceded/followed by the same lines as it ends/starts with). We choose
