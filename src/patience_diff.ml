@@ -8,8 +8,8 @@ module Move_id = Move_id
 
 let ( <|> ) ar (i, j) = if j <= i then [||] else Array.slice ar i j
 
-(* Does the nitty gritty of turning indexes into
-   line numbers and reversing the ranges, returning a nice new hunk *)
+(* Does the nitty gritty of turning indexes into line numbers and reversing the ranges,
+   returning a nice new hunk *)
 let create_hunk prev_start prev_stop next_start next_stop ranges : _ Hunk.t =
   { prev_start = prev_start + 1
   ; prev_size = prev_stop - prev_start
@@ -140,9 +140,9 @@ end = struct
     ;;
 
     (* [play_patience ar ~get_tag] plays patience with the greedy algorithm as described
-       in the Wikipedia article, taking [ar] to be the deck of cards.  It returns the
-       resulting [Piles.t].  Before putting an element of [ar] in a pile, it tags it using
-       [get_tag].  [get_tag] takes as its arguments the full [Piles.t] in its current
+       in the Wikipedia article, taking [ar] to be the deck of cards. It returns the
+       resulting [Piles.t]. Before putting an element of [ar] in a pile, it tags it using
+       [get_tag]. [get_tag] takes as its arguments the full [Piles.t] in its current
        state, and also the specific [Pile.t] that the element of [ar] is being added to.
     *)
     let play_patience ar ~get_tag =
@@ -227,10 +227,10 @@ let%template _longest_increasing_subsequence ar =
 let should_discard_if_other_side_equal ~big_enough = 100 / big_enough
 
 (* These are the numerator and denominator of the cutoff for aborting the patience diff
-   algorithm in [unique_lcs].  (This will result in us using [Plain_diff] instead.)
-   Lowering [switch_to_plain_diff_numerator] / [switch_to_plain_diff_denominator]
-   makes us switch to plain diff less often.  The range of this cutoff is from 0 to 1,
-   where 0 means we always switch and 1 means we never switch. *)
+   algorithm in [unique_lcs]. (This will result in us using [Plain_diff] instead.)
+   Lowering [switch_to_plain_diff_numerator] / [switch_to_plain_diff_denominator] makes us
+   switch to plain diff less often. The range of this cutoff is from 0 to 1, where 0 means
+   we always switch and 1 means we never switch. *)
 let switch_to_plain_diff_numerator = 1
 let switch_to_plain_diff_denominator = 10
 
@@ -296,8 +296,8 @@ module Make (Elt : Hashtbl.Key) = struct
           decr num_pairs;
           Hashtbl.set unique ~key:x ~data:(Not_unique { occurrences_in_a = 0 }))
     done;
-    (* If we're ignoring almost all of the text when we perform the patience
-       diff algorithm, it will often give bad results. *)
+    (* If we're ignoring almost all of the text when we perform the patience diff
+       algorithm, it will often give bad results. *)
     if !num_pairs * switch_to_plain_diff_denominator
        < !intersection_size * switch_to_plain_diff_numerator
     then `Not_enough_unique_tokens
@@ -315,16 +315,16 @@ module Make (Elt : Hashtbl.Key) = struct
       `Computed_lcs (Patience.longest_increasing_subsequence a_b))
   ;;
 
-  (* [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that
-     the list is strictly increasing in both its first and second coordinates.
+  (* [matches a b] returns a list of pairs (i,j) such that a.(i) = b.(j) and such that the
+     list is strictly increasing in both its first and second coordinates.
 
      This is done by first applying unique_lcs to find matches from a to b among those
      elements which are unique in both a and b, and then recursively applying [matches] to
-     each subinterval determined by those matches.  The uniqueness requirement is waived
+     each subinterval determined by those matches. The uniqueness requirement is waived
      for blocks of matching lines at the beginning or end.
 
-     I couldn't figure out how to do this efficiently in a functional way, so
-     this is pretty much a straight translation of the original Python code. *)
+     I couldn't figure out how to do this efficiently in a functional way, so this is
+     pretty much a straight translation of the original Python code. *)
   let matches alpha bravo =
     let matches_ref_length = ref 0 in
     let matches_ref = ref [] in
@@ -427,12 +427,12 @@ module Make (Elt : Hashtbl.Key) = struct
     List.rev !collapsed
   ;;
 
-  (* Given that there's an insert/delete of size [left_change] to the left, and
-     an insert/delete of size [right_change] to the right, should we keep
-     this block of length [block_len] in our list of matches, or discard it? *)
+  (* Given that there's an insert/delete of size [left_change] to the left, and an
+     insert/delete of size [right_change] to the right, should we keep this block of
+     length [block_len] in our list of matches, or discard it? *)
   let should_discard_match ~big_enough ~left_change ~right_change ~block_len =
-    (* Throw away if its effective length is too small,
-       relative to its surrounding inserts / deletes. *)
+    (* Throw away if its effective length is too small, relative to its surrounding
+       inserts / deletes. *)
     block_len < big_enough
     && ((left_change > block_len && right_change > block_len)
         || (left_change >= block_len + should_discard_if_other_side_equal ~big_enough
@@ -482,11 +482,10 @@ module Make (Elt : Hashtbl.Key) = struct
         List.rev (final_pending :: final_ans))
   ;;
 
-  (* Attempts to eliminate the "tunnel vision" problem described in the
-     "Semantic Chaff" section of https://neil.fraser.name/writing/diff/.
-     To do this, we go through each pair of consecutive matches
-     and pretend to combine them into one match.  If that match would
-     be deleted by [basic_semantic_cleanup], we delete both. *)
+  (* Attempts to eliminate the "tunnel vision" problem described in the "Semantic Chaff"
+     section of https://neil.fraser.name/writing/diff/. To do this, we go through each
+     pair of consecutive matches and pretend to combine them into one match. If that match
+     would be deleted by [basic_semantic_cleanup], we delete both. *)
   let advanced_semantic_cleanup ~big_enough matching_blocks =
     if big_enough <= 1
     then matching_blocks
@@ -523,7 +522,7 @@ module Make (Elt : Hashtbl.Key) = struct
         in
         List.rev (final_pendingB :: final_pendingA :: final_ans)
         (* The loop above only deleted the second element of each pair we're supposed to
-           delete.  This call to [basic_semantic_cleanup] is guaranteed to finish the job
+           delete. This call to [basic_semantic_cleanup] is guaranteed to finish the job
            by deleting the remaining element of those pairs. *)
         |> basic_semantic_cleanup ~big_enough)
   ;;
@@ -534,14 +533,14 @@ module Make (Elt : Hashtbl.Key) = struct
     |> advanced_semantic_cleanup ~big_enough
   ;;
 
-  (* When we have a choice, we'd prefer one block of equality to two.
-     For example, instead of A <insert>B A</insert> C D E F, we prefer
-     <insert>A B</insert> A C D E F.  There are two reasons:
+  (* When we have a choice, we'd prefer one block of equality to two. For example, instead
+     of A <insert>B A</insert> C D E F, we prefer <insert>A B</insert> A C D E F. There
+     are two reasons:
 
-     (1) A is usually something like "let", and so the second version is more
-     semantically accurate
-     (2) Semantic cleanup may delete the lone A match, but it will not delete
-     the A C D E F match). So by moving the A match, we've also saved it. *)
+     (1) A is usually something like "let", and so the second version is more semantically
+         accurate
+     (2) Semantic cleanup may delete the lone A match, but it will not delete the A C D E
+         F match). So by moving the A match, we've also saved it. *)
   let combine_equalities ~prev ~next ~matches =
     match matches with
     | [] -> []
@@ -582,9 +581,9 @@ module Make (Elt : Hashtbl.Key) = struct
         let updated_ans, updated_pending, updated_new_block =
           loop ans ~pending ~new_block:block
         in
-        (* In the original Google heuristic, we would either move all or none
-           of pending.  But because it might start with an unmatched `Newline(0, None),
-           we are fine with moving all but one token of it. *)
+        (* In the original Google heuristic, we would either move all or none of pending.
+           But because it might start with an unmatched `Newline(0, None), we are fine
+           with moving all but one token of it. *)
         if updated_pending.length = 0 || updated_pending.length = 1
         then (
           let new_ans =
@@ -681,7 +680,8 @@ module Make (Elt : Hashtbl.Key) = struct
                 next: A B C D X P Q R S T X E F G H I
                 prev: A B C D X             E F G H I
                      ^         ^           ^         ^
-                     \..left../            \..right../ v}
+                     \..left../            \..right../
+                 v}
 
                  We want to see if shortening [left] and lengthening and moving-left
                  [right] is viable. Requires last element of [left] to be equal to the
@@ -718,7 +718,8 @@ module Make (Elt : Hashtbl.Key) = struct
                 next: A B C D X P Q R S T X E F G H I
                 prev: A B C D             X E F G H I
                      ^       ^           ^           ^
-                     \.left./            \...right.../ v}
+                     \.left./            \...right.../
+                 v}
 
                  We want to see if lengthening [left] and shortening and moving-right
                  [right] is viable. Requires element after [left] to be equal to the first
@@ -907,16 +908,16 @@ module Make (Elt : Hashtbl.Key) = struct
             let rest = Range.Same (range <|> (size - context, size)) :: rest in
             aux rest [] alo ahi blo bhi acc_hunks)
           else (
-            (* Otherwise, this range is small enough that it qualifies as context for
-               the both the previous and forthcoming range, so simply add it to
-               curr_ranges untouched *)
+            (* Otherwise, this range is small enough that it qualifies as context for the
+               both the previous and forthcoming range, so simply add it to curr_ranges
+               untouched *)
             let curr_ranges = Range.Same range :: curr_ranges in
             let ahi = ahi + size in
             let bhi = bhi + size in
             aux rest curr_ranges alo ahi blo bhi acc_hunks)
         | range :: rest ->
-          (* Any range that isn't an Equal is important and not just context, so keep
-             it in curr_ranges *)
+          (* Any range that isn't an Equal is important and not just context, so keep it
+             in curr_ranges *)
           let curr_ranges = range :: curr_ranges in
           (* rest could be anything, so extract hunk_info from range *)
           let ahi, bhi =
@@ -946,8 +947,8 @@ module Make (Elt : Hashtbl.Key) = struct
       let ranges, alo, ahi, blo, bhi =
         match ranges with
         (* If the first range is an Equal, shave off the front of the range, according to
-           context.  Keep it on the ranges list so hunk construction can see where the range
-           begins *)
+           context. Keep it on the ranges list so hunk construction can see where the
+           range begins *)
         | Same range :: rest ->
           let stop = Array.length range in
           let start = max 0 (stop - context) in

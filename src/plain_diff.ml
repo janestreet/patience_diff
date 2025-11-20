@@ -87,9 +87,8 @@ let diag ~fd ~bd ~sh ~xv ~yv ~xoff ~xlim ~yoff ~ylim ~too_expensive ~find_minima
   fd.(sh + fmid) <- xoff;
   bd.(sh + bmid) <- xlim;
   With_return.with_return (fun ({ return } : Partition.t With_return.return) ->
-    (* [c] is cost.
-       [fmin], [fmax] are limits of the forward search.
-       [bmin], [bmax] are limits of the backward search. *)
+    (* [c] is cost. [fmin], [fmax] are limits of the forward search. [bmin], [bmax] are
+       limits of the backward search. *)
     let rec loop ~c ~fmin ~fmax ~bmin ~bmax =
       (* Extend the forward search by one edit step in each diagonal. *)
       let fmin =
@@ -295,8 +294,8 @@ let diff_loop ~cutoff a ai b bi n m =
 
 (* [make_indexer a b] returns an array of the indices of items of [a] which are also
    present in [b]; this way, the main algorithm can skip items which, anyway, are
-   different. This improves the speed much.  At the same time, this function updates the
-   items of [a] and [b] so that all equal items point to the same unique item.  All item
+   different. This improves the speed much. At the same time, this function updates the
+   items of [a] and [b] so that all equal items point to the same unique item. All item
    comparisons in the main algorithm can therefore be done with [phys_equal] instead of
    [=], which can improve speed much. *)
 let make_indexer hashable a b =
