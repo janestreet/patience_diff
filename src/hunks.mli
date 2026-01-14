@@ -6,7 +6,7 @@ type 'a t = 'a Hunk.t list
     range. *)
 val unified : 'a t -> 'a t
 
-(** [ranges t] concatenates all the ranges of all hunks together **)
+(** [ranges t] concatenates all the ranges of all hunks together *)
 val ranges : 'a t -> 'a Range.t list
 
 val concat_map_ranges : 'a t -> f:('a Range.t -> 'b Range.t list) -> 'b t

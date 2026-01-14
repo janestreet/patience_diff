@@ -1,4 +1,4 @@
-(** Basic Myers diff algorithm, translated from GNU diff. **)
+(** Basic Myers diff algorithm, translated from GNU diff. *)
 
 (** [iter_matches ?cutoff ~f ~hashable a b] diffs the arrays [a] and [b] (as in
     /usr/bin/diff), and calls [f] on each element of the longest common subsequence in
