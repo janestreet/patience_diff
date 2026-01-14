@@ -218,12 +218,12 @@ let%template _longest_increasing_subsequence ar =
     loop [] m.(!maxlen))
 ;;
 
-(* Configurable parameters for [semantic_cleanup] and [unique_lcs], all chosen based
-   on empirical observation. *)
+(* Configurable parameters for [semantic_cleanup] and [unique_lcs], all chosen based on
+   empirical observation. *)
 (* This function is called on the edge case of semantic cleanup, when there's a change
-   that's exactly the same length as the size of the match.  If the insert on the next
-   side is a LOT larger than the match, it should be semantically cleaned up, but
-   most of the time it should be left alone. *)
+   that's exactly the same length as the size of the match. If the insert on the next side
+   is a LOT larger than the match, it should be semantically cleaned up, but most of the
+   time it should be left alone. *)
 let should_discard_if_other_side_equal ~big_enough = 100 / big_enough
 
 (* These are the numerator and denominator of the cutoff for aborting the patience diff
@@ -599,13 +599,13 @@ module Make (Elt : Hashtbl.Key) = struct
 
   (* The aim here is to be able to transform e.g. foo f<insert>rob f</insert>lip into foo
      <insert>frob </insert>flip by scoring each boundary. *)
-  (* {prev,next}_{elts,scorable} are the two arrays being diffed as (a) [Elt.t array]s
+  (* [{prev,next}]_[{elts,scorable}] are the two arrays being diffed as (a) [Elt.t array]s
      which comes from mapping with the [transform] function and (b) ['a array]s where the
      [score] function operates on values of type ['a].
 
-     [blocks] is a list of [Matching_block.t]s which specify the contiguous chunks
-     of prev/next which are the same (when index ranges are missing, that missing
-     chunk is unique to the array they are missing from). *)
+     [blocks] is a list of [Matching_block.t]s which specify the contiguous chunks of
+     prev/next which are the same (when index ranges are missing, that missing chunk is
+     unique to the array they are missing from). *)
   let align_diffs
     ~prev_elts
     ~prev_scorable
