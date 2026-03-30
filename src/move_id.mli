@@ -4,7 +4,7 @@ open! Core
     distinguish it from other moves. *)
 type t [@@deriving sexp, compare ~localize]
 
-include Comparable.S_plain with type t := t
+include Comparable.S_plain [@mode local] with type t := t
 
 val to_string : t -> string
 

@@ -3,4 +3,4 @@
  (public_name patience_diff)
  (libraries base core)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_jane -compare-require-explicit-locality)))
