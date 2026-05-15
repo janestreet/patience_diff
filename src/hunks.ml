@@ -3,11 +3,11 @@ module Stable = struct
   module Hunk = Hunk.Stable
 
   module V2 = struct
-    type 'a t = 'a Hunk.V2.t list [@@deriving sexp, bin_io]
+    type 'a t = 'a Hunk.V2.t list [@@deriving sexp, bin_io, equal ~localize]
   end
 
   module V1 = struct
-    type 'a t = 'a Hunk.V1.t list [@@deriving sexp, bin_io]
+    type 'a t = 'a Hunk.V1.t list [@@deriving sexp, bin_io, equal ~localize]
 
     let to_v2 = Core.List.map ~f:Hunk.V1.to_v2
     let of_v2_no_moves_exn = Core.List.map ~f:Hunk.V1.of_v2_no_moves_exn

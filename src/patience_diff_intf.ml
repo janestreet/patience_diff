@@ -119,6 +119,7 @@ module type Patience_diff = sig
   module Matching_block = Matching_block
   module Range = Range
   module Move_id = Move_id
+  module Move_kind = Move_kind
   module Make (Elt : Hashtbl.Key) : S with type elt = Elt.t
 
   (* [String] uses String.compare *)

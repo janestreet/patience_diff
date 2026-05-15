@@ -22,7 +22,7 @@ type 'a t =
   | Next of 'a array * Move_kind.t option
   | Replace of 'a array * 'a array * Move_id.t option
   | Unified of 'a array * Move_id.t option
-[@@deriving sexp, compare ~localize]
+[@@deriving sexp, compare ~localize, equal ~localize]
 
 (** [all_same ranges] returns true if all [ranges] are Same *)
 val all_same : 'a t list -> bool
@@ -42,11 +42,11 @@ val next_size : 'a t -> int
 
 module Stable : sig
   module V2 : sig
-    type nonrec 'a t = 'a t [@@deriving sexp, bin_io, compare ~localize]
+    type nonrec 'a t = 'a t [@@deriving sexp, bin_io, compare ~localize, equal ~localize]
   end
 
   module V1 : sig
-    type nonrec 'a t [@@deriving sexp, bin_io]
+    type nonrec 'a t [@@deriving sexp, bin_io, equal ~localize]
 
     val to_v2 : 'a t -> 'a V2.t
     val of_v2_no_moves_exn : 'a V2.t -> 'a t
