@@ -10,7 +10,7 @@ module Stable = struct
       ; next_size : int
       ; ranges : 'a Range.V2.t list
       }
-    [@@deriving fields ~getters, sexp, bin_io, compare ~localize]
+    [@@deriving fields ~getters, sexp, bin_io, compare ~localize, equal ~localize]
   end
 
   module V1 = struct
@@ -21,7 +21,7 @@ module Stable = struct
       ; next_size : int
       ; ranges : 'a Range.V1.t list
       }
-    [@@deriving fields ~getters, sexp, bin_io]
+    [@@deriving fields ~getters, sexp, bin_io, equal ~localize]
 
     let to_v2 t =
       { V2.prev_start = t.prev_start

@@ -5,6 +5,7 @@ module Hunks = Hunks
 module Matching_block = Matching_block
 module Range = Range
 module Move_id = Move_id
+module Move_kind = Move_kind
 
 let ( <|> ) ar (i, j) = if j <= i then [||] else Array.slice ar i j
 

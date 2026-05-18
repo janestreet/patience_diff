@@ -13,11 +13,11 @@ val concat_map_ranges : 'a t -> f:('a Range.t -> 'b Range.t list) -> 'b t
 
 module Stable : sig
   module V2 : sig
-    type nonrec 'a t = 'a t [@@deriving sexp, bin_io]
+    type nonrec 'a t = 'a t [@@deriving sexp, bin_io, equal ~localize]
   end
 
   module V1 : sig
-    type nonrec 'a t [@@deriving sexp, bin_io]
+    type nonrec 'a t [@@deriving sexp, bin_io, equal ~localize]
 
     val to_v2 : 'a t -> 'a V2.t
     val of_v2_no_moves_exn : 'a V2.t -> 'a t

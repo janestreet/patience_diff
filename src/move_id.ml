@@ -2,7 +2,7 @@ module Stable = struct
   open! Core.Core_stable
 
   module V1 = struct
-    type t = int [@@deriving sexp, bin_io, compare ~localize]
+    type t = int [@@deriving sexp, bin_io, compare ~localize, equal ~localize]
   end
 end
 
