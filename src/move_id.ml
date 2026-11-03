@@ -2,13 +2,13 @@ module Stable = struct
   open! Core.Core_stable
 
   module V1 = struct
-    type t = int [@@deriving sexp, bin_io, compare ~localize, equal ~localize]
+    type t = int [@@deriving sexp, bin_io, compare, equal]
   end
 end
 
 open! Core
 include Stable.V1
-include Comparable.Make_plain [@mode local] (Stable.V1)
+include Comparable.Make_plain (Stable.V1)
 
 let zero = 0
 let succ = Int.succ

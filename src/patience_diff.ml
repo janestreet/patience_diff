@@ -21,7 +21,7 @@ let create_hunk prev_start prev_stop next_start next_stop ranges : _ Hunk.t =
 ;;
 
 module Ordered_sequence : sig
-  type elt = int * int [@@deriving compare ~localize]
+  type elt = int * int [@@deriving compare]
 
   (* A [t] has its second coordinates in increasing order *)
 
@@ -32,14 +32,13 @@ module Ordered_sequence : sig
 end = struct
   type elt = int * int [@@deriving sexp_of]
 
-  let%template compare_elt a b =
-    (Comparable.lexicographic [@mode m])
+  let compare_elt a b =
+    Comparable.lexicographic
       [ (fun (_, y0) (_, y1) -> Int.compare y0 y1)
       ; (fun (x0, _) (x1, _) -> Int.compare x0 x1)
       ]
       a
       b
-  [@@mode m = (local, global)]
   ;;
 
   type t = elt array [@@deriving sexp_of]
@@ -189,7 +188,7 @@ end
 
 let compare_int_pair = Tuple.T2.compare ~cmp1:Int.compare ~cmp2:Int.compare
 
-let%template _longest_increasing_subsequence ar =
+let _longest_increasing_subsequence ar =
   let ar = (ar : Ordered_sequence.t :> (int * int) array) in
   let len = Array.length ar in
   if len <= 1
@@ -207,7 +206,7 @@ let%template _longest_increasing_subsequence ar =
           ar.(i)
           ~len:(max (!maxlen - 1) 0)
           ~pos:1
-        |> (Option.value [@mode local]) ~default:0
+        |> Option.value ~default:0
       in
       pred.(i) <- m.(p);
       if p = !maxlen || compare_int_pair ar.(i) ar.(p + 1) < 0

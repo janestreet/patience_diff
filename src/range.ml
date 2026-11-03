@@ -8,7 +8,7 @@ module Stable = struct
       | Next of 'a array * Move_kind.Stable.V1.t option
       | Replace of 'a array * 'a array * Move_id.Stable.V1.t option
       | Unified of 'a array * Move_id.Stable.V1.t option
-    [@@deriving sexp, bin_io, compare ~localize, equal ~localize]
+    [@@deriving sexp, bin_io, compare, equal]
   end
 
   module V1 = struct
@@ -18,7 +18,7 @@ module Stable = struct
       | Next of 'a array
       | Replace of 'a array * 'a array
       | Unified of 'a array
-    [@@deriving sexp, bin_io, equal ~localize]
+    [@@deriving sexp, bin_io, equal]
 
     let to_v2 : 'a t -> 'a V2.t = function
       | Same lines -> Same lines
