@@ -2,4 +2,4 @@
  (name patience_diff_lib_test)
  (libraries base core expect_test_helpers_core patience_diff_lib)
  (preprocess
-  (pps ppx_jane)))
+  (pps ppx_jane -compare-require-explicit-locality)))
